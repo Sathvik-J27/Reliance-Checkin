@@ -1,0 +1,25 @@
+{
+  "name": "reliance-checkin-backend",
+  "version": "1.0.0",
+  "description": "Reliance Surfaces check-in backend API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "cd ../frontend && npm install && npm run build",
+    "start:prod": "node -r dotenv/config server.js dotenv_config_path=.env.production"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.2.1",
+    "pdf-lib": "^1.17.1",
+    "resend": "^6.9.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
