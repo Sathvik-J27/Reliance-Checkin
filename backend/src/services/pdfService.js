@@ -175,12 +175,20 @@ async function generateWaiverPDF(checkInData) {
   });
   state.y -= LINE_HEIGHT_TITLE;
 
-  // "LIABILITY WAIVER" — centered, black
-  const waiverText  = 'LIABILITY WAIVER';
-  const waiverWidth = fontBold.widthOfTextAtSize(waiverText, FONT_SIZE_TITLE);
-  state.page.drawText(waiverText, {
-    x: (PAGE_WIDTH - waiverWidth) / 2, y: state.y,
-    size: FONT_SIZE_TITLE, font: fontBold, color: COLOR_BLACK,
+  // "WAIVER AND RELEASE, INDEMNITY AGREEMENT, AND INFORMED CONSENT" — centered, black
+  const waiverTitleText = 'WAIVER AND RELEASE, INDEMNITY AGREEMENT,';
+  const waiverTitleText2 = 'AND INFORMED CONSENT';
+  const FONT_SIZE_WAIVER_TITLE = 11;
+  const waiverTitleWidth = fontBold.widthOfTextAtSize(waiverTitleText, FONT_SIZE_WAIVER_TITLE);
+  state.page.drawText(waiverTitleText, {
+    x: (PAGE_WIDTH - waiverTitleWidth) / 2, y: state.y,
+    size: FONT_SIZE_WAIVER_TITLE, font: fontBold, color: COLOR_BLACK,
+  });
+  state.y -= LINE_HEIGHT_HEADER;
+  const waiverTitleWidth2 = fontBold.widthOfTextAtSize(waiverTitleText2, FONT_SIZE_WAIVER_TITLE);
+  state.page.drawText(waiverTitleText2, {
+    x: (PAGE_WIDTH - waiverTitleWidth2) / 2, y: state.y,
+    size: FONT_SIZE_WAIVER_TITLE, font: fontBold, color: COLOR_BLACK,
   });
   state.y -= LINE_HEIGHT_TITLE;
 
@@ -201,7 +209,16 @@ async function generateWaiverPDF(checkInData) {
   });
   state.y -= LINE_HEIGHT_BODY;
 
-  // ── Section 1: Customer Information ─────────────────────────────────────────
+  // ── Section 1: Waiver Text (no heading, paragraphs only) ───────────────────
+  for (const paragraph of WAIVER_PARAGRAPHS) {
+    await drawParagraph(state, paragraph, fontRegular, FONT_SIZE_BODY, LINE_HEIGHT_BODY);
+    state.y -= LINE_HEIGHT_BODY * 0.6;
+  }
+
+  state.y -= LINE_HEIGHT_BODY;
+
+  // ── Section 2: Customer Information ─────────────────────────────────────────
+  await ensureSpace(state, LINE_HEIGHT_HEADER + LINE_HEIGHT_BODY);
   state.page.drawText('CUSTOMER INFORMATION', {
     x: MARGIN_LEFT, y: state.y,
     size: FONT_SIZE_HEADER, font: fontBold, color: COLOR_BLACK,
@@ -226,7 +243,7 @@ async function generateWaiverPDF(checkInData) {
   }
   state.y -= LINE_HEIGHT_BODY;
 
-  // ── Section 2: Referral Sources ──────────────────────────────────────────────
+  // ── Section 3: Referral Sources ──────────────────────────────────────────────
   if (checkInData.referralSources && checkInData.referralSources.length > 0) {
     await ensureSpace(state, LINE_HEIGHT_HEADER + LINE_HEIGHT_BODY);
     state.page.drawText('HOW DID YOU HEAR ABOUT US?', {
@@ -245,7 +262,7 @@ async function generateWaiverPDF(checkInData) {
     state.y -= LINE_HEIGHT_BODY;
   }
 
-  // ── Section 3: Party Size ────────────────────────────────────────────────────
+  // ── Section 4: Party Size ────────────────────────────────────────────────────
   await ensureSpace(state, LINE_HEIGHT_HEADER + LINE_HEIGHT_BODY);
   state.page.drawText('PARTY INFORMATION', {
     x: MARGIN_LEFT, y: state.y,
@@ -259,34 +276,6 @@ async function generateWaiverPDF(checkInData) {
     `Party Size: ${adults} Adult${adults !== 1 ? 's' : ''}${minors > 0 ? `, ${minors} Minor${minors !== 1 ? 's' : ''}` : ''}`,
     fontRegular, FONT_SIZE_BODY, COLOR_DARK, LINE_HEIGHT_BODY
   );
-  state.y -= LINE_HEIGHT_BODY;
-
-  // ── Section 4: Waiver Title ───────────────────────────────────────────────────
-  await ensureSpace(state, LINE_HEIGHT_HEADER + LINE_HEIGHT_BODY);
-  state.page.drawText('WAIVER TEXT', {
-    x: MARGIN_LEFT, y: state.y,
-    size: FONT_SIZE_HEADER, font: fontBold, color: COLOR_BLACK,
-  });
-  state.y -= LINE_HEIGHT_HEADER;
-
-  // Waiver title (bold)
-  const titleLines = wrapText(WAIVER_TITLE, fontBold, FONT_SIZE_BODY, CONTENT_WIDTH);
-  for (const line of titleLines) {
-    await ensureSpace(state, LINE_HEIGHT_BODY);
-    state.page.drawText(line, {
-      x: MARGIN_LEFT, y: state.y,
-      size: FONT_SIZE_BODY, font: fontBold, color: COLOR_BLACK,
-    });
-    state.y -= LINE_HEIGHT_BODY;
-  }
-  state.y -= LINE_HEIGHT_BODY * 0.5;
-
-  // Waiver paragraphs
-  for (const paragraph of WAIVER_PARAGRAPHS) {
-    await drawParagraph(state, paragraph, fontRegular, FONT_SIZE_BODY, LINE_HEIGHT_BODY);
-    state.y -= LINE_HEIGHT_BODY * 0.6;
-  }
-
   state.y -= LINE_HEIGHT_BODY;
 
   // ── Section 5: Signatures ─────────────────────────────────────────────────────
