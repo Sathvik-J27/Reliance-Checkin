@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const checkInRoutes  = require('./src/routes/checkInRoutes');
 const accountRoutes  = require('./src/routes/accountRoutes');
@@ -43,10 +44,14 @@ app.use(errorHandler);
 // Serve React frontend in production (single-service deployment)
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '../frontend/build');
-  app.use(express.static(buildPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-  });
+  if (fs.existsSync(buildPath)) {
+    app.use(express.static(buildPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(buildPath, 'index.html'));
+    });
+  } else {
+    console.warn('Frontend build not found at', buildPath);
+  }
 }
 
 module.exports = app;
