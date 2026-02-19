@@ -7,8 +7,13 @@ const checkInRoutes  = require('./src/routes/checkInRoutes');
 const accountRoutes  = require('./src/routes/accountRoutes');
 const materialRoutes = require('./src/routes/materialRoutes');
 const errorHandler = require('./src/middleware/errorHandler');
+const ipWhitelist = require('./src/middleware/ipWhitelist');
 
 const app = express();
+app.set('trust proxy', 1);
+
+// IP whitelist — must be first middleware
+app.use(ipWhitelist);
 
 // CORS: allow the frontend origin (dev: localhost:3000, prod: same-origin or FRONTEND_URL)
 app.use(cors({
