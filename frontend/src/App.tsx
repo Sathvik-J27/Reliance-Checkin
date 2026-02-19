@@ -61,13 +61,23 @@ function mapApiCheckIn(record: any): CheckIn {
 type View = 'home' | 'customer-step1' | 'customer-step2' | 'customer-step3a' | 'customer-step3b' | 'customer-step3c' | 'customer-step3d' | 'customer-step4' | 'staff-login' | 'staff-dashboard' | 'pricing-dashboard' | 'analysis-dashboard' | 'revisit-lookup' | 'revisit-step1' | 'revisit-step2' | 'revisit-waiver' | 'revisit-confirmation' | 'staff2-login' | 'staff2-dashboard';
 
 function App() {
-  const [view, setView] = useState<View>('home');
+  const [view, setView] = useState<View>(() => {
+    const stored = localStorage.getItem('staff2Session');
+    if (stored) {
+      try {
+        const { expiry } = JSON.parse(stored);
+        if (Date.now() < expiry) return 'staff2-dashboard';
+      } catch { /* ignore */ }
+    }
+    return 'home';
+  });
   const [currentCheckIn, setCurrentCheckIn] = useState<Partial<CheckIn>>({});
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [staffUsername, setStaffUsername] = useState<string>('');
 
   // Multi-visitor flow state
   const [partySize, setPartySize] = useState<{ adults: number; minors: number }>({ adults: 1, minors: 0 });
+  const [checkInHasMinors, setCheckInHasMinors] = useState(false);
   const [mainSignature, setMainSignature] = useState<{ agreed: boolean; signature: string } | null>(null);
   const [additionalAdultSignatures, setAdditionalAdultSignatures] = useState<Array<{ name: string; signature: string }>>([]);
   const [currentAdultIndex, setCurrentAdultIndex] = useState(0);
@@ -77,8 +87,18 @@ function App() {
   // Revisit flow state
   const [revisitCustomer, setRevisitCustomer] = useState<any>(null);
 
-  // Staff2 state
-  const [staff2Username, setStaff2Username] = useState<string>('');
+  // Staff2 state — restore from localStorage if session is still valid (8 hours)
+  const [staff2Username, setStaff2Username] = useState<string>(() => {
+    const stored = localStorage.getItem('staff2Session');
+    if (stored) {
+      try {
+        const { username, expiry } = JSON.parse(stored);
+        if (Date.now() < expiry) return username;
+        localStorage.removeItem('staff2Session');
+      } catch { localStorage.removeItem('staff2Session'); }
+    }
+    return '';
+  });
 
   // Load all check-ins from the backend on app startup
   useEffect(() => {
@@ -270,6 +290,9 @@ function App() {
       return;
     }
 
+    // Capture minors flag before resetting
+    setCheckInHasMinors(partySize.minors > 0);
+
     // Reset multi-visitor state
     setPartySize({ adults: 1, minors: 0 });
     setMainSignature(null);
@@ -283,6 +306,7 @@ function App() {
 
   const handleReturnHome = useCallback(() => {
     setCurrentCheckIn({});
+    setCheckInHasMinors(false);
     setPartySize({ adults: 1, minors: 0 });
     setMainSignature(null);
     setAdditionalAdultSignatures([]);
@@ -293,8 +317,8 @@ function App() {
 
   const handleStaffLogin = (username: string, role: 'staff' | 'pricing' | 'analysis' | 'staff2') => {
     if (role === 'staff2') {
-      setStaff2Username(username);
-      setView('staff2-dashboard');
+      handleStaff2Login(username);
+      return;
     } else {
       setStaffUsername(username);
       if (role === 'pricing') {
@@ -423,11 +447,14 @@ function App() {
 
   // Staff2 handlers
   const handleStaff2Login = (username: string) => {
+    const expiry = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+    localStorage.setItem('staff2Session', JSON.stringify({ username, expiry }));
     setStaff2Username(username);
     setView('staff2-dashboard');
   };
 
   const handleStaff2Logout = () => {
+    localStorage.removeItem('staff2Session');
     setStaff2Username('');
     setView('home');
   };
@@ -579,6 +606,7 @@ function App() {
     return (
       <CheckInStep4
         customerName={`${currentCheckIn.firstName} ${currentCheckIn.lastName}`}
+        hasMinors={checkInHasMinors}
         onReturnHome={handleReturnHome}
       />
     );

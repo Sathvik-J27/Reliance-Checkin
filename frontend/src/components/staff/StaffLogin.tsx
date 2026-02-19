@@ -100,9 +100,6 @@ export function StaffLogin({ onLogin }: StaffLoginProps) {
             Sign In
           </button>
 
-          <p className="text-center text-sm" style={{ color: 'var(--color-text-gray)' }}>
-            staff / pricing / analysis / staff2 — password: reliance
-          </p>
         </form>
       </div>
     </div>

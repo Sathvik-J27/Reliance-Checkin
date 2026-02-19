@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface CheckInStep4Props {
   customerName: string;
+  hasMinors?: boolean;
   onReturnHome: () => void;
 }
 
-export function CheckInStep4({ customerName, onReturnHome }: CheckInStep4Props) {
+export function CheckInStep4({ customerName, hasMinors, onReturnHome }: CheckInStep4Props) {
   const [countdown, setCountdown] = useState(15);
   const onReturnHomeRef = useRef(onReturnHome);
 
@@ -40,9 +41,18 @@ export function CheckInStep4({ customerName, onReturnHome }: CheckInStep4Props) 
 
         <h1 className="mb-4" style={{ color: 'var(--color-gold)' }}>Thank You, {customerName}!</h1>
         
-        <p className="mb-8" style={{ color: 'var(--color-text-white)', fontSize: '18px' }}>
+        <p className="mb-6" style={{ color: 'var(--color-text-white)', fontSize: '18px' }}>
           Your check-in is complete. A member of our team will be with you shortly.
         </p>
+
+        {hasMinors && (
+          <div className="flex items-start gap-3 mb-8 p-4 rounded-lg text-left" style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', border: '1px solid var(--color-gold)' }}>
+            <AlertTriangle size={24} style={{ color: 'var(--color-gold)', flexShrink: 0, marginTop: '2px' }} />
+            <p style={{ color: 'var(--color-gold)', fontSize: '16px', fontWeight: 500 }}>
+              Caution: Children under 15 years old must stay in the waiting room.
+            </p>
+          </div>
+        )}
 
         <p className="mb-6" style={{ color: 'var(--color-text-gray)' }}>
           Returning to home screen in <span style={{ color: 'var(--color-gold)' }}>{countdown}</span> seconds...

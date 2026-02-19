@@ -306,7 +306,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
           </div>
 
           {/* Email Addresses */}
-          <div style={{ marginBottom: '200px' }}>
+          <div>
             <label className="block mb-1.5 text-sm" style={{ color: 'var(--color-text-white)' }}>Email Address(es) *</label>
             {formData.emails.map((email, index) => (
               <div key={index} className="flex gap-2 mb-2">

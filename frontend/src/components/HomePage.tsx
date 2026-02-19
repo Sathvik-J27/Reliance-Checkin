@@ -47,11 +47,14 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
           </span>
         </div>
         <div className="flex items-center gap-6 sm:gap-8">
-          <button
+          <a
+            href="https://reliancesurfaces.com/shop/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm sm:text-base transition-colors text-gray-400 hover:text-white"
           >
             Slabs
-          </button>
+          </a>
           <button
             onClick={onStaffLogin}
             className="text-sm sm:text-base transition-colors text-gray-400 hover:text-white"
@@ -124,7 +127,7 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
-              Revisit
+              Revisiting
             </button>
           </div>
         </div>
@@ -195,7 +198,7 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
                 color: '#D4A736'
               }}
             >
-              Revisit
+              Revisiting
             </button>
           </div>
         </div>
