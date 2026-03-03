@@ -72,3 +72,30 @@ ALTER TABLE check_ins
 CREATE INDEX IF NOT EXISTS idx_check_ins_sheet_number ON check_ins(selection_sheet_number);
 -- Index for hold status filtering (materials JSONB contains hold flags)
 CREATE INDEX IF NOT EXISTS idx_check_ins_materials ON check_ins USING GIN(materials);
+
+-- ============================================================
+-- Phase 3 Migration: ESIGN Act Compliance Fields
+-- Run AFTER Phase 1 and Phase 2 migrations.
+-- Adds fields required for electronic signature legal compliance (ESIGN Act, NJ UETA).
+-- ============================================================
+
+ALTER TABLE check_ins
+  ADD COLUMN IF NOT EXISTS esign_consent_timestamp TIMESTAMPTZ,  -- When customer consented to electronic signature
+  ADD COLUMN IF NOT EXISTS ip_address              VARCHAR(45),  -- IPv4 or IPv6 address of signatory
+  ADD COLUMN IF NOT EXISTS session_id              UUID,         -- Unique browser session identifier
+  ADD COLUMN IF NOT EXISTS device_info             JSONB;        -- Device/browser metadata (user agent, screen size, etc.)
+
+-- Composite index for audit trail queries (IP + session + time)
+-- Useful for investigating duplicate sessions or correlating signatures
+CREATE INDEX IF NOT EXISTS idx_check_ins_audit_trail
+  ON check_ins(ip_address, session_id, check_in_time);
+
+-- Index for session-based lookups (find all check-ins from same browser session)
+CREATE INDEX IF NOT EXISTS idx_check_ins_session_id
+  ON check_ins(session_id);
+
+-- Comments for documentation
+COMMENT ON COLUMN check_ins.esign_consent_timestamp IS 'ISO8601 timestamp when customer consented to electronic signature (ESIGN Act requirement)';
+COMMENT ON COLUMN check_ins.ip_address IS 'Client IP address of signatory (proves attribution and location)';
+COMMENT ON COLUMN check_ins.session_id IS 'Unique browser session ID (differentiates customers on same device/IP)';
+COMMENT ON COLUMN check_ins.device_info IS 'Device metadata: userAgent, screenWidth, screenHeight, deviceType (accessibility compliance)';

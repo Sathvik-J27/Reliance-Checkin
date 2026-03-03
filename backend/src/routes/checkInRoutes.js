@@ -9,6 +9,24 @@ const { sendSelectionEmail } = require('../services/emailService');
 const router = express.Router();
 
 /**
+ * Helper function to extract client IP address from request.
+ * Handles X-Forwarded-For header (proxies/load balancers) and direct connections.
+ */
+function getClientIp(req) {
+  // Check X-Forwarded-For header first (used by proxies like Railway, Heroku, etc.)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+    // The first one is the original client IP
+    return forwarded.split(',')[0].trim();
+  }
+
+  // Fallback to direct socket connection
+  // req.socket.remoteAddress or req.connection.remoteAddress
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
+}
+
+/**
  * POST /api/check-ins
  * CQRS Command: Create a new customer check-in.
  *
@@ -33,12 +51,20 @@ router.post('/check-ins', async (req, res, next) => {
 
     const data = validation.data;
 
+    // ── Step 1b: Capture IP address and augment data ─────────────────────────
+    const ipAddress = getClientIp(req);
+    const augmentedData = {
+      ...data,
+      ipAddress,
+      // sessionId and deviceInfo come from frontend via req.body (already in data)
+    };
+
     // ── Step 2: Persist check-in (ACID atomic insert) ─────────────────────────
-    const record = await insertCheckIn(data);
+    const record = await insertCheckIn(augmentedData);
     const checkInId = record.id;
 
     // Attach the DB-generated ID to data so the PDF footer can show it
-    const checkInDataWithId = { ...data, id: checkInId };
+    const checkInDataWithId = { ...augmentedData, id: checkInId };
 
     // ── Steps 3-5: PDF generation + upload (best-effort) ─────────────────────
     let waiverPdfUrl = null;
@@ -46,7 +72,7 @@ router.post('/check-ins', async (req, res, next) => {
 
     try {
       const pdfBytes  = await generateWaiverPDF(checkInDataWithId);
-      const filePath  = buildFilePath(data.firstName, data.lastName, data.checkInTime);
+      const filePath  = buildFilePath(augmentedData.firstName, augmentedData.lastName, augmentedData.checkInTime);
       waiverPdfUrl    = await uploadPdf(pdfBytes, filePath);
       await updateWaiverPdfUrl(checkInId, waiverPdfUrl);
     } catch (err) {
@@ -60,8 +86,8 @@ router.post('/check-ins', async (req, res, next) => {
       success: true,
       data: {
         id:           checkInId,
-        firstName:    data.firstName,
-        lastName:     data.lastName,
+        firstName:    augmentedData.firstName,
+        lastName:     augmentedData.lastName,
         status:       'waiting',
         checkInTime:  record.check_in_time,
         waiverPdfUrl: waiverPdfUrl,

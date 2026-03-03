@@ -48,6 +48,18 @@ const checkInSchema = z.object({
   checkInTime: z.string().datetime({ offset: true }).optional(),
 
   isRevisit: z.boolean().optional().default(false),
+
+  // ESIGN Act compliance fields (optional, for legal validity)
+  esignConsentTimestamp: z.string().datetime({ offset: true }).optional(),
+  sessionId: z.string().uuid().optional(),
+  ipAddress: z.string().max(45).optional(), // IPv4 or IPv6
+  deviceInfo: z.object({
+    userAgent: z.string(),
+    screenWidth: z.number(),
+    screenHeight: z.number(),
+    deviceType: z.string(),
+    timestamp: z.string(),
+  }).optional(),
 });
 
 /**

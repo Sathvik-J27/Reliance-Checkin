@@ -1,10 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ElectronicSignatureConsent } from './ElectronicSignatureConsent';
 
 interface CheckInStep3bProps {
-  onNext: (data: { agreed: boolean; signature: string }) => void;
+  onNext: (data: {
+    agreed: boolean;
+    signature: string;
+    esignConsentTimestamp?: string;
+    sessionId?: string;
+    deviceInfo?: {
+      userAgent: string;
+      screenWidth: number;
+      screenHeight: number;
+      deviceType: string;
+      timestamp: string;
+    };
+  }) => void;
   onBack: () => void;
   isMainVisitor?: boolean;
-  initialData?: { agreed: boolean; signature: string };
+  initialData?: {
+    agreed: boolean;
+    signature: string;
+    esignConsentTimestamp?: string;
+    sessionId?: string;
+    deviceInfo?: any;
+  };
 }
 
 const waiverText = `WAIVER AND RELEASE, INDEMNITY AGREEMENT, AND INFORMED CONSENT
@@ -32,12 +51,41 @@ I am not under the influence of any medication, alcohol, or controlled substance
 I HAVE READ THIS COVENANT NOT TO SUE, WAIVER, RELEASE, INFORMED CONSENT, ASSUMPTION OF RISK AND INDEMNITY AGREEMENT, FULLY UNDERSTAND ITS TERMS, UNDERSTAND THAT I HAVE GIVEN UP SUBSTANTIAL RIGHTS BY SIGNING IT, AND HAVE SIGNED IT FREELY AND VOLUNTARILY WITHOUT ANY INDUCEMENT, ASSURANCE OR GUARANTEE BEING MADE TO ME AND INTEND MY SIGNATURE TO BE A COMPLETE AND UNCONDITIONAL RELEASE OF RELIANCE AND ALL PARTIES MENTIONED HEREIN TO THE GREATEST EXTENT ALLOWED BY LAW. THIS IS A RELEASE OF LIABILITY; DO NOT SIGN THIS DOCUMENT IF YOU DO NOT UNDERSTAND OR DO NOT AGREE WITH ITS TERMS.`;
 
 export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialData }: CheckInStep3bProps) {
+  // ESIGN Consent State
+  const [showConsentModal, setShowConsentModal] = useState(!initialData?.esignConsentTimestamp);
+  const [esignConsentTimestamp, setEsignConsentTimestamp] = useState<string | undefined>(
+    initialData?.esignConsentTimestamp
+  );
+  const [sessionId] = useState<string>(() => {
+    // Use existing session ID or generate new one
+    if (initialData?.sessionId) return initialData.sessionId;
+
+    let sid = sessionStorage.getItem('checkInSessionId');
+    if (!sid) {
+      sid = crypto.randomUUID();
+      sessionStorage.setItem('checkInSessionId', sid);
+    }
+    return sid;
+  });
+  const [deviceInfo] = useState(() => {
+    // Capture device information once
+    if (initialData?.deviceInfo) return initialData.deviceInfo;
+
+    return {
+      userAgent: navigator.userAgent,
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      deviceType: /Mobile|Tablet/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+      timestamp: new Date().toISOString()
+    };
+  });
+
   const [agreed, setAgreed] = useState(initialData?.agreed || false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(!!initialData); // If coming back, assume scrolled
   const [signatureData, setSignatureData] = useState<string>(initialData?.signature || '');
   const [isDrawing, setIsDrawing] = useState(false);
   const [error, setError] = useState<string>('');
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -143,9 +191,21 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
     setSignatureData('');
   };
 
+  const handleConsentGiven = () => {
+    const timestamp = new Date().toISOString();
+    setEsignConsentTimestamp(timestamp);
+    setShowConsentModal(false);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!esignConsentTimestamp) {
+      setError('Electronic signature consent is required');
+      setShowConsentModal(true);
+      return;
+    }
 
     if (!hasScrolledToBottom) {
       setError('Please scroll to the bottom of the waiver to continue');
@@ -162,15 +222,28 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
       return;
     }
 
-    onNext({ agreed, signature: signatureData });
+    onNext({
+      agreed,
+      signature: signatureData,
+      esignConsentTimestamp,
+      sessionId,
+      deviceInfo
+    });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
-      <div className="w-full max-w-3xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
-        <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>
-          {isMainVisitor ? 'Step 3: Waiver' : 'Waiver Agreement'}
-        </h1>
+    <>
+      {/* ESIGN Consent Modal */}
+      <ElectronicSignatureConsent
+        isOpen={showConsentModal}
+        onConsent={handleConsentGiven}
+      />
+
+      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
+        <div className="w-full max-w-3xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
+          <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>
+            {isMainVisitor ? 'Step 3: Waiver' : 'Waiver Agreement'}
+          </h1>
         <p className="text-center mb-6 text-base sm:text-lg" style={{ color: 'var(--color-text-gray)' }}>
           {isMainVisitor ? 'Please read and sign the waiver' : 'Please review and provide your signature'}
         </p>
@@ -273,5 +346,6 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
         </form>
       </div>
     </div>
+    </>
   );
 }

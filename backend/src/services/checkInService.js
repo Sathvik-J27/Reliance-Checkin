@@ -56,6 +56,11 @@ async function insertCheckIn(data) {
       check_in_time:    data.checkInTime || new Date().toISOString(),
       status:           'waiting',
       is_revisit:       data.isRevisit || false,
+      // ESIGN Act compliance fields
+      esign_consent_timestamp: data.esignConsentTimestamp || null,
+      ip_address:       data.ipAddress || null,
+      session_id:       data.sessionId || null,
+      device_info:      data.deviceInfo || null,
     })
     .select('id, check_in_time, status')
     .single();

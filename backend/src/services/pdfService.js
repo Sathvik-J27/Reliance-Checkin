@@ -278,6 +278,30 @@ async function generateWaiverPDF(checkInData) {
   );
   state.y -= LINE_HEIGHT_BODY;
 
+  // ── Section 4.5: Electronic Signature Consent ────────────────────────────────
+  if (checkInData.esignConsentTimestamp) {
+    await ensureSpace(state, LINE_HEIGHT_HEADER + LINE_HEIGHT_BODY * 2);
+    state.page.drawText('ELECTRONIC SIGNATURE CONSENT', {
+      x: MARGIN_LEFT, y: state.y,
+      size: FONT_SIZE_HEADER, font: fontBold, color: COLOR_BLACK,
+    });
+    state.y -= LINE_HEIGHT_HEADER;
+
+    const consentDate = new Date(checkInData.esignConsentTimestamp).toLocaleString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/New_York',
+    });
+
+    const esignText = `The customer consented to sign this waiver electronically on ${consentDate} (EST). The customer acknowledged that their electronic signature has the same legal validity as a handwritten signature under New Jersey law and the federal Electronic Signatures in Global and National Commerce Act (ESIGN Act).`;
+    await drawParagraph(state, esignText, fontRegular, FONT_SIZE_SMALL, LINE_HEIGHT_BODY);
+    state.y -= LINE_HEIGHT_BODY * 2;
+  }
+
   // ── Section 5: Signatures ─────────────────────────────────────────────────────
   await ensureSpace(state, LINE_HEIGHT_HEADER);
   state.page.drawText('SIGNATURES', {
@@ -373,16 +397,38 @@ async function generateWaiverPDF(checkInData) {
 
   // ── Section 7: Footer ─────────────────────────────────────────────────────────
   // Place footer at bottom of current page
-  const footerY = MARGIN_BOTTOM - 10;
+  const footerY = MARGIN_BOTTOM - 24; // Increase space for multi-line footer
   state.page.drawLine({
-    start: { x: MARGIN_LEFT, y: footerY + 16 },
-    end:   { x: MARGIN_RIGHT, y: footerY + 16 },
+    start: { x: MARGIN_LEFT, y: footerY + 28 },
+    end:   { x: MARGIN_RIGHT, y: footerY + 28 },
     thickness: 0.5, color: COLOR_GOLD,
   });
+
+  // Line 1: Document ID and Generated timestamp
   state.page.drawText(`Document ID: ${checkInData.id || 'N/A'}   |   Generated: ${new Date().toISOString()}`, {
+    x: MARGIN_LEFT, y: footerY + 14,
+    size: FONT_SIZE_SMALL, font: fontRegular, color: COLOR_DARK,
+  });
+
+  // Line 2: Session ID and IP address
+  const sessionId = checkInData.sessionId || 'N/A';
+  const ipAddress = checkInData.ipAddress || 'N/A';
+  state.page.drawText(`Session: ${sessionId.substring(0, 13)}...   |   IP: ${ipAddress}`, {
     x: MARGIN_LEFT, y: footerY,
     size: FONT_SIZE_SMALL, font: fontRegular, color: COLOR_DARK,
   });
+
+  // Line 3: Device info (if available)
+  if (checkInData.deviceInfo) {
+    const deviceType = checkInData.deviceInfo.deviceType || 'unknown';
+    const screenRes = checkInData.deviceInfo.screenWidth && checkInData.deviceInfo.screenHeight
+      ? `${checkInData.deviceInfo.screenWidth}x${checkInData.deviceInfo.screenHeight}`
+      : 'N/A';
+    state.page.drawText(`Device: ${deviceType}   |   Screen: ${screenRes}`, {
+      x: MARGIN_LEFT, y: footerY - 14,
+      size: FONT_SIZE_SMALL, font: fontRegular, color: COLOR_DARK,
+    });
+  }
 
   const pdfBytes = await pdfDoc.save();
   return pdfBytes;

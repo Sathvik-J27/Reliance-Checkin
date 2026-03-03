@@ -78,7 +78,13 @@ function App() {
   // Multi-visitor flow state
   const [partySize, setPartySize] = useState<{ adults: number; minors: number }>({ adults: 1, minors: 0 });
   const [checkInHasMinors, setCheckInHasMinors] = useState(false);
-  const [mainSignature, setMainSignature] = useState<{ agreed: boolean; signature: string } | null>(null);
+  const [mainSignature, setMainSignature] = useState<{
+    agreed: boolean;
+    signature: string;
+    esignConsentTimestamp?: string;
+    sessionId?: string;
+    deviceInfo?: any;
+  } | null>(null);
   const [additionalAdultSignatures, setAdditionalAdultSignatures] = useState<Array<{ name: string; signature: string }>>([]);
   const [currentAdultIndex, setCurrentAdultIndex] = useState(0);
   const [minorNames, setMinorNames] = useState<string[]>([]);
@@ -127,15 +133,24 @@ function App() {
     setView('customer-step3b');
   };
 
-  const handleStep3bNext = (data: { agreed: boolean; signature: string }) => {
+  const handleStep3bNext = (data: {
+    agreed: boolean;
+    signature: string;
+    esignConsentTimestamp?: string;
+    sessionId?: string;
+    deviceInfo?: any;
+  }) => {
     console.log('=== STEP 3B NEXT ===');
     console.log('Signature data received:', {
       hasSignature: !!data.signature,
       signatureLength: data.signature?.length,
-      signaturePreview: data.signature?.substring(0, 50)
+      signaturePreview: data.signature?.substring(0, 50),
+      hasEsignConsent: !!data.esignConsentTimestamp,
+      sessionId: data.sessionId,
+      deviceType: data.deviceInfo?.deviceType
     });
     setMainSignature(data);
-    
+
     // If more than 1 adult, collect additional signatures
     if (partySize.adults > 1) {
       setCurrentAdultIndex(0);
@@ -197,7 +212,17 @@ function App() {
     completeCheckIn(names); // Pass names directly instead of relying on state
   };
 
-  const completeCheckIn = async (submittedMinorNames?: string[], submittedAdultSignatures?: Array<{ name: string; signature: string }>, submittedMainSignature?: { agreed: boolean; signature: string }) => {
+  const completeCheckIn = async (
+    submittedMinorNames?: string[],
+    submittedAdultSignatures?: Array<{ name: string; signature: string }>,
+    submittedMainSignature?: {
+      agreed: boolean;
+      signature: string;
+      esignConsentTimestamp?: string;
+      sessionId?: string;
+      deviceInfo?: any;
+    }
+  ) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -244,6 +269,10 @@ function App() {
       partySize,
       visitors:        allVisitors,
       checkInTime:     new Date().toISOString(),
+      // ESIGN compliance fields
+      esignConsentTimestamp: finalMainSignature?.esignConsentTimestamp,
+      sessionId:       finalMainSignature?.sessionId,
+      deviceInfo:      finalMainSignature?.deviceInfo,
     };
 
     try {
