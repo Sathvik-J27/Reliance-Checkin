@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Staff2ViewPopupProps {
   customer: any;
@@ -60,6 +60,26 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
     setFormData({ ...formData, emails: newEmails });
   };
 
+  const [customerImages, setCustomerImages] = useState<{ checkInId: string; checkInTime: string; images: any[] }[]>([]);
+  const [imagesOpen, setImagesOpen] = useState(false);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const phone = customer.phones?.[0];
+    if (!phone) return;
+    setImagesLoading(true);
+    fetch(`/api/images/customer/${encodeURIComponent(phone)}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          setCustomerImages(res.data.filter((g: any) => g.images.length > 0));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setImagesLoading(false));
+  }, [customer.phones]);
+
   const handleSave = () => {
     // Basic validation
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
@@ -71,6 +91,7 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
   };
 
   return (
+    <>
     <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
       <div 
         className="w-full max-w-4xl max-h-[90vh] overflow-y-auto" 
@@ -392,6 +413,65 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
           </div>
         )}
 
+        {/* Uploaded Images (collapsible, read-only) */}
+        <div className="mb-8 rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+          <button
+            onClick={() => setImagesOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3"
+            style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-white)', border: 'none', cursor: 'pointer' }}
+          >
+            <div className="flex items-center gap-2">
+              <ImageIcon size={16} style={{ color: 'var(--color-gold)' }} />
+              <span>Uploaded Images</span>
+              {!imagesLoading && (
+                <span className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: 'rgba(212,167,54,0.15)', color: 'var(--color-gold)' }}>
+                  {customerImages.reduce((sum, g) => sum + g.images.length, 0)}
+                </span>
+              )}
+            </div>
+            {imagesOpen ? <ChevronUp size={16} style={{ color: 'var(--color-text-gray)' }} /> : <ChevronDown size={16} style={{ color: 'var(--color-text-gray)' }} />}
+          </button>
+          {imagesOpen && (
+            <div className="p-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+              {imagesLoading ? (
+                <p style={{ color: 'var(--color-text-gray)', fontSize: '14px' }}>Loading…</p>
+              ) : customerImages.length === 0 ? (
+                <p style={{ color: 'var(--color-text-gray)', fontSize: '14px' }}>No images uploaded.</p>
+              ) : (
+                <div className="space-y-5">
+                  {customerImages.map(group => (
+                    <div key={group.checkInId}>
+                      {customerImages.length > 1 && (
+                        <p className="mb-2 text-sm" style={{ color: 'var(--color-text-gray)' }}>
+                          Visit: {new Date(group.checkInTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      )}
+                      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}>
+                        {group.images.map((img: any) => (
+                          <div
+                            key={img.id}
+                            className="relative rounded-lg overflow-hidden"
+                            style={{ aspectRatio: '1', border: '1px solid var(--color-border)', cursor: 'pointer' }}
+                            onClick={() => setLightboxUrl(img.image_url)}
+                          >
+                            <img src={img.image_url} alt="Material" className="w-full h-full object-cover" />
+                            <div
+                              className="absolute bottom-0 right-0 px-1.5 py-0.5 text-xs font-semibold rounded-tl-lg"
+                              style={{ backgroundColor: 'rgba(0,0,0,0.75)', color: 'var(--color-gold)' }}
+                            >
+                              ×{img.quantity}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Save Button */}
         <div className="flex gap-3">
           <button
@@ -411,5 +491,27 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
         </div>
       </div>
     </div>
+
+    {/* Lightbox */}
+    {lightboxUrl && (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+        onClick={() => setLightboxUrl(null)}
+      >
+        <img
+          src={lightboxUrl}
+          alt="Enlarged material"
+          style={{ maxWidth: '90vw', maxHeight: '90vh', display: 'block', borderRadius: '8px' }}
+          onClick={e => e.stopPropagation()}
+        />
+        <button
+          onClick={() => setLightboxUrl(null)}
+          style={{ position: 'absolute', top: '16px', right: '16px', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '22px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          ×
+        </button>
+      </div>
+    )}
+    </>
   );
 }

@@ -7,7 +7,7 @@ import { CheckInStep3b } from './components/customer/CheckInStep3b';
 import { CheckInStep3c } from './components/customer/CheckInStep3c';
 import { CheckInStep3d } from './components/customer/CheckInStep3d';
 import { CheckInStep4 } from './components/customer/CheckInStep4';
-import { StaffLogin } from './components/staff/StaffLogin';
+import { StaffLogin, CustomerLoginData } from './components/staff/StaffLogin';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { PricingDashboard } from './components/staff/PricingDashboard';
 import { AnalysisDashboard } from './components/staff/AnalysisDashboard';
@@ -21,6 +21,9 @@ import { RevisitWaiver } from './revisit/customer/RevisitWaiver';
 import { RevisitConfirmation } from './revisit/customer/RevisitConfirmation';
 import { Staff2Login } from './revisit/staff2/Staff2Login';
 import { Staff2Dashboard } from './revisit/staff2/Staff2Dashboard';
+import { CustomerImageUpload } from './components/customer/CustomerImageUpload';
+import { CustomerSurvey } from './components/customer/CustomerSurvey';
+import { RatingDashboard } from './components/staff/RatingDashboard';
 
 function mapApiCheckIn(record: any): CheckIn {
   const materials = record.materials || [];
@@ -58,7 +61,7 @@ function mapApiCheckIn(record: any): CheckIn {
   };
 }
 
-type View = 'home' | 'customer-step1' | 'customer-step2' | 'customer-step3a' | 'customer-step3b' | 'customer-step3c' | 'customer-step3d' | 'customer-step4' | 'staff-login' | 'staff-dashboard' | 'pricing-dashboard' | 'analysis-dashboard' | 'revisit-lookup' | 'revisit-step1' | 'revisit-step2' | 'revisit-waiver' | 'revisit-confirmation' | 'staff2-login' | 'staff2-dashboard';
+type View = 'home' | 'customer-step1' | 'customer-step2' | 'customer-step3a' | 'customer-step3b' | 'customer-step3c' | 'customer-step3d' | 'customer-step4' | 'staff-login' | 'staff-dashboard' | 'pricing-dashboard' | 'analysis-dashboard' | 'revisit-lookup' | 'revisit-step1' | 'revisit-step2' | 'revisit-waiver' | 'revisit-confirmation' | 'staff2-login' | 'staff2-dashboard' | 'customer-upload' | 'customer-survey' | 'rating-dashboard';
 
 function App() {
   const [view, setView] = useState<View>(() => {
@@ -105,6 +108,31 @@ function App() {
     }
     return '';
   });
+
+  // User geolocation — requested on mount, included in check-in payloads as fallback for IP restriction
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => { /* denied or unavailable — IP check on backend will handle it */ }
+      );
+    }
+  }, []);
+
+  // Customer session state (set after customer logs in with phone)
+  const [customerSession, setCustomerSession] = useState<{
+    token: string;
+    checkInId: string;
+    customerName: string;
+  } | null>(null);
+
+  // Survey data — persists after customerSession is cleared so the survey can still post
+  const [surveyData, setSurveyData] = useState<{
+    token: string;
+    checkInId: string;
+  } | null>(null);
 
   // Load all check-ins from the backend on app startup
   useEffect(() => {
@@ -271,6 +299,7 @@ function App() {
       checkInTime:     new Date().toISOString(),
       // ESIGN compliance fields
       esignConsentTimestamp: finalMainSignature?.esignConsentTimestamp,
+      ...(userLocation && { lat: userLocation.lat, lng: userLocation.lng }),
       sessionId:       finalMainSignature?.sessionId,
       deviceInfo:      finalMainSignature?.deviceInfo,
     };
@@ -286,11 +315,14 @@ function App() {
 
       if (!response.ok) {
         console.error('Check-in API error:', result);
-        const errorMsg = response.status === 409
-          ? result.error
-          : 'Check-in failed. Please try again.';
+        let errorMsg = 'Check-in failed. Please try again.';
+        if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
+          errorMsg = 'Check-in is only available at the Reliance office. Please connect to the office WiFi or enable location services on your device.';
+        } else if (response.status === 409) {
+          errorMsg = result.error;
+          setView('customer-step1');
+        }
         alert(errorMsg);
-        if (response.status === 409) setView('customer-step1');
         setIsSubmitting(false);
         return;
       }
@@ -344,10 +376,15 @@ function App() {
     setView('home');
   }, []);
 
-  const handleStaffLogin = (username: string, role: 'staff' | 'pricing' | 'analysis' | 'staff2') => {
+  const handleStaffLogin = (username: string, role: 'staff' | 'pricing' | 'analysis' | 'staff2' | 'rating' | 'customer', customerData?: CustomerLoginData) => {
     if (role === 'staff2') {
       handleStaff2Login(username);
-      return;
+    } else if (role === 'customer' && customerData) {
+      setCustomerSession(customerData);
+      setView('customer-upload');
+    } else if (role === 'rating') {
+      setStaffUsername(username);
+      setView('rating-dashboard');
     } else {
       setStaffUsername(username);
       if (role === 'pricing') {
@@ -358,6 +395,19 @@ function App() {
         setView('staff-dashboard');
       }
     }
+  };
+
+  const handleImagesDone = () => {
+    if (customerSession) {
+      setSurveyData({ token: customerSession.token, checkInId: customerSession.checkInId });
+    }
+    setCustomerSession(null);
+    setView('customer-survey');
+  };
+
+  const handleSurveyDone = () => {
+    setSurveyData(null);
+    setView('home');
   };
 
   const handleStaffLogout = () => {
@@ -439,6 +489,7 @@ function App() {
       visitors:        waiverData.visitors,
       checkInTime:     new Date().toISOString(),
       isRevisit:       true,
+      ...(userLocation && { lat: userLocation.lat, lng: userLocation.lng }),
     };
 
     try {
@@ -449,7 +500,11 @@ function App() {
       });
       const result = await response.json();
       if (!response.ok) {
-        alert('Revisit check-in failed. Please try again.');
+        if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
+          alert('Check-in is only available at the Reliance office. Please connect to the office WiFi or enable location services on your device.');
+        } else {
+          alert('Revisit check-in failed. Please try again.');
+        }
         setIsSubmitting(false);
         return;
       }
@@ -488,17 +543,12 @@ function App() {
     setView('home');
   };
 
-  const handleMarkAsDone = async (id: string) => {
-    // Optimistically update local state for instant UI feedback
+  const handleMarkAsDone = (id: string) => {
+    // Update local state so other views (main staff dashboard) reflect the change.
+    // Staff2Dashboard makes the actual PATCH API call — no need to duplicate it here.
     setCheckIns(prev => prev.map(c =>
       c.id === id ? { ...c, status: 'done' } : c
     ));
-    // Persist to backend so status survives a page refresh
-    try {
-      await fetch(`/api/check-ins/${id}/done`, { method: 'PATCH' });
-    } catch (err) {
-      console.error('Failed to persist done status:', err);
-    }
   };
 
   const handleSaveDraft = (id: string, draft: DraftData) => {
@@ -747,6 +797,32 @@ function App() {
         onMarkAsDone={handleMarkAsDone}
       />
     );
+  }
+
+  if (view === 'customer-upload') {
+    if (!customerSession) return null;
+    return (
+      <CustomerImageUpload
+        customerName={customerSession.customerName}
+        checkInId={customerSession.checkInId}
+        authToken={customerSession.token}
+        onDone={handleImagesDone}
+      />
+    );
+  }
+
+  if (view === 'customer-survey') {
+    return (
+      <CustomerSurvey
+        checkInId={surveyData?.checkInId ?? ''}
+        authToken={surveyData?.token ?? ''}
+        onDone={handleSurveyDone}
+      />
+    );
+  }
+
+  if (view === 'rating-dashboard') {
+    return <RatingDashboard onLogout={handleStaffLogout} />;
   }
 
   // Home screen

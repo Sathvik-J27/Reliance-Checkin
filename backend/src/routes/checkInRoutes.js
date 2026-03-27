@@ -1,12 +1,55 @@
 const express = require('express');
+const locationGuard = require('../middleware/locationGuard');
 const { validateCheckIn } = require('../validators/checkInValidator');
-const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, saveDraft, getAllCheckIns, markAsDone } = require('../services/checkInService');
+const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, markAsDone } = require('../services/checkInService');
 const { generateWaiverPDF } = require('../services/pdfService');
 const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
 const { sendSelectionEmail } = require('../services/emailService');
 
 const router = express.Router();
+
+// ── Server-Sent Events (SSE) — real-time push to all open staff dashboards ────
+// Replaces per-client polling; every mutation calls broadcastAll() so all screens
+// update within milliseconds instead of up to 3 s.
+const sseClients = new Set();
+
+async function broadcastAll() {
+  if (sseClients.size === 0) return;
+  try {
+    const checkIns = await getAllCheckIns();
+    const payload = `data: ${JSON.stringify({ type: 'update', data: checkIns })}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(payload);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  } catch (err) {
+    console.error('[SSE] broadcastAll failed:', err.message);
+  }
+}
+
+/**
+ * GET /api/check-ins/events
+ * SSE stream — staff dashboards subscribe here instead of polling.
+ * The browser's EventSource API auto-reconnects on disconnect.
+ */
+router.get('/check-ins/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  // Send an immediate ping so the client knows it's connected
+  res.write('data: {"type":"connected"}\n\n');
+
+  sseClients.add(res);
+
+  // Remove client when they disconnect (tab closed, navigation, etc.)
+  req.on('close', () => sseClients.delete(res));
+});
 
 /**
  * Helper function to extract client IP address from request.
@@ -37,7 +80,7 @@ function getClientIp(req) {
  *     If steps 3-5 fail, the check-in is still saved with waiver_pdf_url = null.
  *     This keeps the check-in atomic while making PDF generation best-effort.
  */
-router.post('/check-ins', async (req, res, next) => {
+router.post('/check-ins', locationGuard, async (req, res, next) => {
   try {
     // ── Step 1: Validate ──────────────────────────────────────────────────────
     const validation = validateCheckIn(req.body);
@@ -101,6 +144,9 @@ router.post('/check-ins', async (req, res, next) => {
       response.pdfError = pdfError;
     }
 
+    // Push update to all open staff dashboards (fire-and-forget)
+    broadcastAll().catch(() => {});
+
     return res.status(201).json(response);
 
   } catch (err) {
@@ -136,13 +182,21 @@ router.post('/check-ins/:id/complete', async (req, res, next) => {
       });
     }
 
-    // ── Step 2: Atomic DB update ───────────────────────────────────────────
-    const record = await completeCheckIn(id, {
-      helpedBy,
-      selectionSheetNumber,
-      materials: materials || [],
-      fabricator: selectedFabricator || null,
-    });
+    // ── Step 2: Atomic DB update (idempotent — throws 409 if already helped) ─
+    let record;
+    try {
+      record = await completeCheckIn(id, {
+        helpedBy,
+        selectionSheetNumber,
+        materials: materials || [],
+        fabricator: selectedFabricator || null,
+      });
+    } catch (err) {
+      if (err.status === 409) {
+        return res.status(409).json({ success: false, error: err.message });
+      }
+      throw err;
+    }
 
     // ── Steps 3-4: PDF + email (best-effort, decoupled) ───────────────────
     const customerName = `${record.first_name} ${record.last_name}`;
@@ -199,6 +253,9 @@ router.post('/check-ins/:id/complete', async (req, res, next) => {
 
     const issues = [pdfError && `PDF: ${pdfError}`, emailError && `Email: ${emailError}`].filter(Boolean);
 
+    // Push update to all open staff dashboards (fire-and-forget)
+    broadcastAll().catch(() => {});
+
     return res.status(200).json({
       success: true,
       data: { id, status: 'helped' },
@@ -244,6 +301,9 @@ router.patch('/check-ins/:id/done', async (req, res, next) => {
 
     await markAsDone(id);
 
+    // Push update to all open staff dashboards (fire-and-forget)
+    broadcastAll().catch(() => {});
+
     return res.status(200).json({ success: true, data: { id, status: 'done' } });
   } catch (err) {
     next(err);
@@ -268,7 +328,56 @@ router.patch('/check-ins/:id/draft', async (req, res, next) => {
 
     await saveDraft(id, { draftStep, materials, fabricator, helpedBy, selectionSheetNumber });
 
+    // Push update to all open staff dashboards (fire-and-forget)
+    broadcastAll().catch(() => {});
+
     return res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/check-ins/:id/claim
+ * Atomically claim a waiting check-in for a staff member.
+ * Uses a conditional DB update (.is('currently_helped_by', null)) so only the
+ * first request wins — prevents two staff members from attending the same customer.
+ * Returns { claimed: true } on success or { claimed: false, claimedBy } if taken.
+ */
+router.post('/check-ins/:id/claim', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid check-in ID format' });
+    }
+
+    const { helpedBy } = req.body;
+    if (!helpedBy) {
+      return res.status(400).json({ success: false, error: 'helpedBy is required' });
+    }
+
+    const record = await claimCheckIn(id, helpedBy);
+
+    if (record) {
+      // Claim succeeded — broadcast so other dashboards see the attending label immediately
+      broadcastAll().catch(() => {});
+      return res.status(200).json({ success: true, claimed: true });
+    }
+
+    // Claim failed — fetch who has it so the frontend can show a message
+    const { data: existing } = await require('../config/supabase')
+      .from('check_ins')
+      .select('currently_helped_by')
+      .eq('id', id)
+      .single();
+
+    return res.status(200).json({
+      success: true,
+      claimed: false,
+      claimedBy: existing?.currently_helped_by || null,
+    });
   } catch (err) {
     next(err);
   }

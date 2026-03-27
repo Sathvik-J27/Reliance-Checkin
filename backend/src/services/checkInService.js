@@ -88,8 +88,8 @@ async function updateWaiverPdfUrl(id, pdfUrl) {
 
 /**
  * CQRS Command: Mark check-in as helped (staff submission).
- * Saves all selection data so it persists across refreshes.
- * Returns the updated record including customer contact info for email dispatch.
+ * Idempotent: uses .neq('status', 'helped') so only one concurrent request wins.
+ * If another staff member already completed it, throws a 409.
  */
 async function completeCheckIn(id, { helpedBy, selectionSheetNumber, materials, fabricator }) {
   const { data: record, error } = await supabase
@@ -105,14 +105,44 @@ async function completeCheckIn(id, { helpedBy, selectionSheetNumber, materials, 
       draft_step:              3,
     })
     .eq('id', id)
+    .neq('status', 'helped')          // atomic guard — only wins if not already helped
     .select('id, first_name, last_name, emails, check_in_time')
-    .single();
+    .maybeSingle();                    // returns null (not error) when 0 rows updated
 
   if (error) {
     throw new Error(`Failed to complete check-in: ${error.message}`);
   }
 
+  if (!record) {
+    // 0 rows updated → another staff member already completed this check-in
+    const err = new Error('This check-in was already completed by another staff member.');
+    err.status = 409;
+    throw err;
+  }
+
   return record;
+}
+
+/**
+ * CQRS Command: Atomically claim a waiting check-in for a staff member.
+ * Only succeeds if currently_helped_by is null — first staff to call this wins.
+ * Returns the record on success, or null if already claimed by someone else.
+ */
+async function claimCheckIn(id, helpedBy) {
+  const { data: record, error } = await supabase
+    .from('check_ins')
+    .update({ currently_helped_by: helpedBy })
+    .eq('id', id)
+    .eq('status', 'waiting')
+    .is('currently_helped_by', null)   // atomic: only claim if unclaimed
+    .select('id, currently_helped_by')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to claim check-in: ${error.message}`);
+  }
+
+  return record; // null means someone else already claimed it
 }
 
 /**
@@ -200,4 +230,4 @@ async function markAsDone(id) {
   }
 }
 
-module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, saveDraft, getAllCheckIns, markAsDone };
+module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, markAsDone };

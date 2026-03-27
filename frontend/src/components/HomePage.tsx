@@ -51,15 +51,15 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
             href="https://reliancesurfaces.com/shop/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm sm:text-base transition-colors text-gray-400 hover:text-white"
+            className="text-sm sm:text-base text-gray-400 transition-all duration-200 nav-link"
           >
             Slabs
           </a>
           <button
             onClick={onStaffLogin}
-            className="text-sm sm:text-base transition-colors text-gray-400 hover:text-white"
+            className="text-sm sm:text-base text-gray-400 transition-all duration-200 nav-link"
           >
-            Staff
+            Login
           </button>
         </div>
       </nav>
@@ -278,6 +278,31 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
         .eagle-wings-mobile {
           animation: wingFlapMobile 4s ease-in-out infinite, subtleGlowMobile 3s ease-in-out infinite;
           transform-origin: center;
+        }
+
+        .nav-link {
+          position: relative;
+          text-decoration: none;
+          padding-bottom: 2px;
+        }
+
+        .nav-link::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 0;
+          height: 1px;
+          background-color: #D4A736;
+          transition: width 0.25s ease;
+        }
+
+        .nav-link:hover {
+          color: #D4A736 !important;
+        }
+
+        .nav-link:hover::after {
+          width: 100%;
         }
       `}</style>
     </div>

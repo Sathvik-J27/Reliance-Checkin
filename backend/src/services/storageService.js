@@ -1,6 +1,9 @@
+const crypto  = require('crypto');
+const path    = require('path');
 const supabase = require('../config/supabase');
 
-const BUCKET = process.env.STORAGE_BUCKET || 'waivers';
+const BUCKET        = process.env.STORAGE_BUCKET  || 'waivers';
+const IMAGE_BUCKET  = process.env.IMAGE_BUCKET    || 'customer-images';
 
 /**
  * Sanitizes a name component for use in a file path.
@@ -118,4 +121,53 @@ async function uploadPdf(pdfBytes, filePath, retries = 3) {
   throw new Error(`PDF upload failed after ${retries} attempts: ${lastError?.message}`);
 }
 
-module.exports = { buildFilePath, uploadPdf };
+/**
+ * Uploads an image buffer to the `customer-images` bucket.
+ * Path: {checkInId}/{uuid}.{ext}
+ *
+ * @param {Buffer} imageBuffer        - Raw image bytes
+ * @param {string} checkInId          - UUID of the check-in (used as folder)
+ * @param {string} originalFilename   - Original file name (used to derive extension)
+ * @param {string} contentType        - MIME type (e.g. "image/jpeg")
+ * @returns {{ publicUrl: string, storagePath: string }}
+ */
+async function uploadImage(imageBuffer, checkInId, originalFilename, contentType) {
+  const ext         = path.extname(originalFilename || '').toLowerCase() || '.jpg';
+  const uuid        = crypto.randomUUID();
+  const storagePath = `${checkInId}/${uuid}${ext}`;
+
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(storagePath, imageBuffer, {
+      contentType,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Image upload failed: ${error.message}`);
+  }
+
+  const { data: urlData } = supabase.storage
+    .from(IMAGE_BUCKET)
+    .getPublicUrl(storagePath);
+
+  return { publicUrl: urlData.publicUrl, storagePath };
+}
+
+/**
+ * Removes an image file from the `customer-images` bucket.
+ * Called alongside the DB deletion in imageService.deleteImage.
+ *
+ * @param {string} storagePath - The path that was returned by uploadImage
+ */
+async function deleteImageFromStorage(storagePath) {
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .remove([storagePath]);
+
+  if (error) {
+    throw new Error(`Failed to delete image from storage: ${error.message}`);
+  }
+}
+
+module.exports = { buildFilePath, uploadPdf, uploadImage, deleteImageFromStorage };

@@ -28,40 +28,64 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Load queue from checkIns prop
-  useEffect(() => {
-    loadQueue();
-  }, [checkIns]);
+  // Local snapshot of all check-ins — starts from prop (instant render) then kept fresh by poll
+  const [allCheckIns, setAllCheckIns] = useState<any[]>(checkIns);
 
-  // Load history when filters change
+  // Re-derive queue whenever allCheckIns changes
   useEffect(() => {
-    if (activeTab === 'history') {
-      loadHistory();
-    }
-  }, [activeTab, selectedMonth, selectedDay, selectedYear, checkIns]);
-
-  const loadQueue = async () => {
-    // Filter checkIns with status 'waiting' and sort by check-in time (oldest first - FIFO)
-    const queue = checkIns
+    const queue = allCheckIns
       .filter(c => c.status === 'waiting')
       .sort((a, b) => new Date(a.checkInTime).getTime() - new Date(b.checkInTime).getTime());
     setQueueCustomers(queue);
-  };
+  }, [allCheckIns]);
 
-  const loadHistory = async () => {
-    // Filter checkIns with status 'done' for the selected date
-    const filtered = checkIns.filter(c => {
-      if (c.status !== 'done' && c.status !== 'helped') return false;
-      
-      const checkInDate = new Date(c.checkInTime);
-      return (
-        checkInDate.getMonth() + 1 === selectedMonth &&
-        checkInDate.getDate() === selectedDay &&
-        checkInDate.getFullYear() === selectedYear
-      );
-    });
-    setHistoryCustomers(filtered);
-  };
+  // Re-derive history whenever filters or allCheckIns changes.
+  // Filter by helpedTime (when staff actually processed them) so "today's history"
+  // shows everyone helped today regardless of when they checked in.
+  useEffect(() => {
+    if (activeTab === 'history') {
+      const filtered = allCheckIns.filter(c => {
+        if (c.status !== 'done' && c.status !== 'helped') return false;
+        const d = new Date(c.helpedTime || c.checkInTime);
+        return (
+          d.getMonth() + 1 === selectedMonth &&
+          d.getDate() === selectedDay &&
+          d.getFullYear() === selectedYear
+        );
+      });
+      setHistoryCustomers(filtered);
+    }
+  }, [activeTab, selectedMonth, selectedDay, selectedYear, allCheckIns]);
+
+  // Subscribe to real-time updates via SSE instead of polling.
+  // The server pushes the full check-in list after every mutation, so all
+  // staff dashboards update within milliseconds.  EventSource auto-reconnects.
+  useEffect(() => {
+    // Initial load
+    fetch('/api/check-ins')
+      .then(r => r.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data)) setAllCheckIns(json.data);
+      })
+      .catch(() => {});
+
+    const es = new EventSource('/api/check-ins/events');
+
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'update' && Array.isArray(msg.data)) {
+          setAllCheckIns(msg.data);
+        }
+      } catch { /* ignore malformed messages */ }
+    };
+
+    es.onerror = () => {
+      // EventSource will automatically retry — no manual fallback needed
+    };
+
+    return () => es.close();
+  }, []);
 
   const handleView = (customer: any) => {
     setSelectedCustomer(customer);
@@ -69,29 +93,51 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
   };
 
   const handleDone = async (customerId: string) => {
-    // Update locally (in real implementation, this would call API)
-    const updatedQueue = queueCustomers.filter(c => c.id !== customerId);
-    setQueueCustomers(updatedQueue);
-    
-    // Note: In production, you'd call the API here:
-    // await fetch(`/api/staff2/customers/${customerId}/done`, { method: 'PUT' });
-    onMarkAsDone(customerId);
+    const now = new Date().toISOString();
+    // Optimistic update — set helpedTime so history date filter matches immediately
+    setAllCheckIns(prev =>
+      prev.map(c => c.id === customerId ? { ...c, status: 'done', helpedTime: now } : c)
+    );
+    try {
+      await fetch(`/api/check-ins/${customerId}/done`, { method: 'PATCH' });
+      // SSE broadcast will confirm with authoritative server data
+    } catch {
+      // Revert optimistic update on failure
+      setAllCheckIns(prev =>
+        prev.map(c => c.id === customerId ? { ...c, status: 'waiting', helpedTime: null } : c)
+      );
+    }
+    onMarkAsDone(customerId); // sync App.tsx state for other views
+  };
+
+  const handleAttend = async (customerId: string) => {
+    try {
+      const res = await fetch(`/api/check-ins/${customerId}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helpedBy: username }),
+      });
+      const json = await res.json();
+
+      if (json.claimed) {
+        // Optimistic update — SSE will confirm with authoritative data
+        setAllCheckIns(prev =>
+          prev.map(c => c.id === customerId ? { ...c, currentlyHelpedBy: username } : c)
+        );
+      } else if (json.claimedBy) {
+        // Another staff member already claimed this customer
+        setAllCheckIns(prev =>
+          prev.map(c => c.id === customerId ? { ...c, currentlyHelpedBy: json.claimedBy } : c)
+        );
+      }
+    } catch {
+      // Network error — SSE will resync state on reconnect
+    }
   };
 
   const handleSaveCustomer = async (customerId: string, updatedData: any) => {
-    // Update locally in both queue and history
-    const updatedQueue = queueCustomers.map(c => 
-      c.id === customerId ? { ...c, ...updatedData } : c
-    );
-    const updatedHistory = historyCustomers.map(c => 
-      c.id === customerId ? { ...c, ...updatedData } : c
-    );
-    setQueueCustomers(updatedQueue);
-    setHistoryCustomers(updatedHistory);
+    setAllCheckIns(prev => prev.map(c => c.id === customerId ? { ...c, ...updatedData } : c));
     setShowViewPopup(false);
-    
-    // Note: In production, you'd call the API here:
-    // await fetch(`/api/staff2/customers/${customerId}`, { method: 'PUT', body: JSON.stringify(updatedData) });
   };
 
   // Calculate daily stats
@@ -184,8 +230,10 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   <Staff2QueueItem
                     key={customer.id}
                     customer={customer}
+                    currentUsername={username}
                     onView={handleView}
                     onDone={handleDone}
+                    onAttend={handleAttend}
                   />
                 ))}
               </div>
