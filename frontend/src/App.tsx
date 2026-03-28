@@ -111,20 +111,14 @@ function App() {
 
   // User geolocation — must be within office radius to check in or revisit
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [locationDenied, setLocationDenied] = useState(false);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setLocationStatus('granted');
-        },
-        () => setLocationStatus('denied')
-      );
-    } else {
-      setLocationStatus('denied');
-    }
+    if (!navigator.geolocation) { setLocationDenied(true); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setLocationDenied(true)
+    );
   }, []);
 
   const OFFICE_LAT = 40.68334033848859;
@@ -142,20 +136,31 @@ function App() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  function checkLocationAccess(): boolean {
-    if (locationStatus === 'denied' || !userLocation) {
-      alert('Location access is required to check in. Please enable location services and refresh the page.');
-      return false;
+  // Requests a fresh live location at the moment of button click, then runs onAllow if within radius
+  function verifyLocationThenRun(onAllow: () => void) {
+    if (!navigator.geolocation) {
+      alert('Location services are not supported by your browser.');
+      return;
     }
-    const distance = haversineMeters(userLocation.lat, userLocation.lng, OFFICE_LAT, OFFICE_LNG);
-    if (distance > OFFICE_RADIUS_M) {
-      alert('Access restricted to showroom location.');
-      return false;
-    }
-    return true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        const distance = haversineMeters(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
+        console.log(`[LocationCheck] distance=${Math.round(distance)}m, limit=${OFFICE_RADIUS_M}m`);
+        if (distance > OFFICE_RADIUS_M) {
+          alert('Access restricted to showroom location.');
+        } else {
+          onAllow();
+        }
+      },
+      () => {
+        setLocationDenied(true);
+        alert('Location access is required to check in. Please enable location services and try again.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   }
-
-  const locationDenied = locationStatus === 'denied';
 
   // Customer session state (set after customer logs in with phone)
   const [customerSession, setCustomerSession] = useState<{
@@ -868,9 +873,9 @@ function App() {
   // Home screen
   return (
     <HomePage
-      onCustomerCheckIn={() => { if (checkLocationAccess()) setView('customer-step1'); }}
+      onCustomerCheckIn={() => verifyLocationThenRun(() => setView('customer-step1'))}
       onStaffLogin={() => setView('staff-login')}
-      onRevisit={() => { if (checkLocationAccess()) setView('revisit-lookup'); }}
+      onRevisit={() => verifyLocationThenRun(() => setView('revisit-lookup'))}
       onStaff2Login={() => setView('staff2-login')}
       locationDenied={locationDenied}
     />
