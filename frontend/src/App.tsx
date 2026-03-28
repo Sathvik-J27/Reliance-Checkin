@@ -111,18 +111,51 @@ function App() {
 
   // User geolocation — must be within office radius to check in or revisit
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationDenied, setLocationDenied] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => setLocationDenied(true)
+        pos => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocationStatus('granted');
+        },
+        () => setLocationStatus('denied')
       );
     } else {
-      setLocationDenied(true);
+      setLocationStatus('denied');
     }
   }, []);
+
+  const OFFICE_LAT = 40.68334033848859;
+  const OFFICE_LNG = -74.29989367402125;
+  const OFFICE_RADIUS_M = 200;
+
+  function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000;
+    const toRad = (d: number) => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function checkLocationAccess(): boolean {
+    if (locationStatus === 'denied' || !userLocation) {
+      alert('Location access is required to check in. Please enable location services and refresh the page.');
+      return false;
+    }
+    const distance = haversineMeters(userLocation.lat, userLocation.lng, OFFICE_LAT, OFFICE_LNG);
+    if (distance > OFFICE_RADIUS_M) {
+      alert('Access restricted to showroom location.');
+      return false;
+    }
+    return true;
+  }
+
+  const locationDenied = locationStatus === 'denied';
 
   // Customer session state (set after customer logs in with phone)
   const [customerSession, setCustomerSession] = useState<{
@@ -835,9 +868,9 @@ function App() {
   // Home screen
   return (
     <HomePage
-      onCustomerCheckIn={() => setView('customer-step1')}
+      onCustomerCheckIn={() => { if (checkLocationAccess()) setView('customer-step1'); }}
       onStaffLogin={() => setView('staff-login')}
-      onRevisit={() => setView('revisit-lookup')}
+      onRevisit={() => { if (checkLocationAccess()) setView('revisit-lookup'); }}
       onStaff2Login={() => setView('staff2-login')}
       locationDenied={locationDenied}
     />
