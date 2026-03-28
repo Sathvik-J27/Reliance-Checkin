@@ -23,8 +23,8 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
 }
 
 module.exports = function locationGuard(req, res, next) {
-  // Disabled in development or if neither IP list nor office coordinates are configured
-  if (process.env.NODE_ENV !== 'production' || (ALLOWED_IPS.length === 0 && !OFFICE_LAT)) {
+  // Skip entirely if office coordinates are not configured
+  if (!OFFICE_LAT || !OFFICE_LNG) {
     return next();
   }
 
@@ -38,19 +38,25 @@ module.exports = function locationGuard(req, res, next) {
     return next();
   }
 
-  // 2. Geolocation check — coordinates sent in request body
+  // 2. Geolocation check — coordinates must be present
   const lat = parseFloat(req.body.lat);
   const lng = parseFloat(req.body.lng);
 
-  if (!isNaN(lat) && !isNaN(lng) && OFFICE_LAT && OFFICE_LNG) {
-    const distance = haversineMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
-    if (distance <= OFFICE_RADIUS_M) {
-      return next();
-    }
-    console.warn(`[LocationGuard] GPS rejected: distance=${Math.round(distance)}m from office (limit=${OFFICE_RADIUS_M}m)`);
+  if (isNaN(lat) || isNaN(lng)) {
+    console.warn(`[LocationGuard] Blocked: location not shared, ip="${clientIp}"`);
+    return res.status(403).json({
+      success: false,
+      error: 'Location access is required to check in. Please enable location services and try again.',
+      code: 'LOCATION_REQUIRED',
+    });
   }
 
-  console.warn(`[LocationGuard] Blocked: ip="${clientIp}" lat=${lat} lng=${lng}`);
+  const distance = haversineMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
+  if (distance <= OFFICE_RADIUS_M) {
+    return next();
+  }
+
+  console.warn(`[LocationGuard] GPS rejected: distance=${Math.round(distance)}m from office (limit=${OFFICE_RADIUS_M}m), ip="${clientIp}"`);
   res.status(403).json({
     success: false,
     error: 'Check-in is only available at the Reliance office.',

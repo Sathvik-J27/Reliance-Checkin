@@ -8,9 +8,10 @@ interface HomePageProps {
   onStaffLogin: () => void;
   onRevisit: () => void;
   onStaff2Login?: () => void;
+  locationDenied?: boolean;
 }
 
-export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePageProps) {
+export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationDenied }: HomePageProps) {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
       {/* Animated Eagle Background - Desktop Only (fills right side) */}
@@ -90,41 +91,60 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
             Surfaces that tell a story
           </p>
 
+          {locationDenied && (
+            <div className="mb-4 px-4 py-3 rounded-lg text-sm max-w-md" style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)', border: '1px solid rgba(220, 38, 38, 0.5)', color: '#FCA5A5' }}>
+              Location access is required to check in. Please enable location services in your browser and refresh the page.
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row items-start gap-4 max-w-md">
             <button
               onClick={onCustomerCheckIn}
+              disabled={locationDenied}
               className="w-full sm:w-auto px-8 py-3.5 rounded-lg text-base font-medium transition-all"
-              style={{ 
-                backgroundColor: '#D4A736', 
+              style={{
+                backgroundColor: locationDenied ? '#6b7280' : '#D4A736',
                 color: '#000000',
-                border: 'none'
+                border: 'none',
+                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                opacity: locationDenied ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#E5B946';
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                if (!locationDenied) {
+                  e.currentTarget.style.backgroundColor = '#E5B946';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#D4A736';
-                e.currentTarget.style.transform = 'translateY(0)';
+                if (!locationDenied) {
+                  e.currentTarget.style.backgroundColor = '#D4A736';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
               }}
             >
               Check-In
             </button>
             <button
               onClick={onRevisit}
+              disabled={locationDenied}
               className="w-full sm:w-auto px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: 'transparent',
-                border: '1px solid #D4A736',
-                color: '#D4A736'
+                border: `1px solid ${locationDenied ? '#6b7280' : '#D4A736'}`,
+                color: locationDenied ? '#6b7280' : '#D4A736',
+                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                opacity: locationDenied ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(212, 167, 54, 0.1)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
+                if (!locationDenied) {
+                  e.currentTarget.style.backgroundColor = 'rgba(212, 167, 54, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.transform = 'translateY(0)';
+                if (!locationDenied) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
               }}
             >
               Revisiting
@@ -177,25 +197,36 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
             Surfaces that tell a story
           </p>
 
+          {locationDenied && (
+            <div className="mb-3 px-4 py-3 rounded-lg text-sm max-w-xs mx-auto w-full" style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)', border: '1px solid rgba(220, 38, 38, 0.5)', color: '#FCA5A5' }}>
+              Location access is required. Please enable location services and refresh.
+            </div>
+          )}
           <div className="flex flex-col gap-3 max-w-xs mx-auto w-full">
             <button
               onClick={onCustomerCheckIn}
+              disabled={locationDenied}
               className="w-full px-8 py-3.5 rounded-lg text-base font-medium transition-all"
-              style={{ 
-                backgroundColor: '#D4A736', 
+              style={{
+                backgroundColor: locationDenied ? '#6b7280' : '#D4A736',
                 color: '#000000',
-                border: 'none'
+                border: 'none',
+                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                opacity: locationDenied ? 0.5 : 1,
               }}
             >
               Check-In
             </button>
             <button
               onClick={onRevisit}
+              disabled={locationDenied}
               className="w-full px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: 'transparent',
-                border: '1px solid #D4A736',
-                color: '#D4A736'
+                border: `1px solid ${locationDenied ? '#6b7280' : '#D4A736'}`,
+                color: locationDenied ? '#6b7280' : '#D4A736',
+                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                opacity: locationDenied ? 0.5 : 1,
               }}
             >
               Revisiting

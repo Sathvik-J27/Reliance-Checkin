@@ -109,15 +109,18 @@ function App() {
     return '';
   });
 
-  // User geolocation — requested on mount, included in check-in payloads as fallback for IP restriction
+  // User geolocation — must be within office radius to check in or revisit
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => { /* denied or unavailable — IP check on backend will handle it */ }
+        () => setLocationDenied(true)
       );
+    } else {
+      setLocationDenied(true);
     }
   }, []);
 
@@ -316,8 +319,10 @@ function App() {
       if (!response.ok) {
         console.error('Check-in API error:', result);
         let errorMsg = 'Check-in failed. Please try again.';
-        if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
-          errorMsg = 'Check-in is only available at the Reliance office. Please connect to the office WiFi or enable location services on your device.';
+        if (response.status === 403 && (result.code === 'LOCATION_RESTRICTED' || result.code === 'LOCATION_REQUIRED')) {
+          errorMsg = result.code === 'LOCATION_REQUIRED'
+            ? 'Location access is required to check in. Please enable location services and try again.'
+            : 'Check-in is only available at the Reliance office.';
         } else if (response.status === 409) {
           errorMsg = result.error;
           setView('customer-step1');
@@ -500,8 +505,10 @@ function App() {
       });
       const result = await response.json();
       if (!response.ok) {
-        if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
-          alert('Check-in is only available at the Reliance office. Please connect to the office WiFi or enable location services on your device.');
+        if (response.status === 403 && result.code === 'LOCATION_REQUIRED') {
+          alert('Location access is required to check in. Please enable location services and try again.');
+        } else if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
+          alert('Check-in is only available at the Reliance office.');
         } else {
           alert('Revisit check-in failed. Please try again.');
         }
@@ -832,6 +839,7 @@ function App() {
       onStaffLogin={() => setView('staff-login')}
       onRevisit={() => setView('revisit-lookup')}
       onStaff2Login={() => setView('staff2-login')}
+      locationDenied={locationDenied}
     />
   );
 }
