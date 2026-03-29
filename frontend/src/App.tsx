@@ -114,6 +114,7 @@ function App() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [onOfficeNetwork, setOnOfficeNetwork] = useState(false);
+  const [isVerifyingLocation, setIsVerifyingLocation] = useState(false);
 
   useEffect(() => {
     // Check if the device is on the office Wi-Fi (matched by public IP on the server).
@@ -168,6 +169,7 @@ function App() {
   // Tries high-accuracy (GPS) first; if that times out or is unavailable (common on old Android/Wi-Fi
   // tablets indoors), automatically retries with low-accuracy (Wi-Fi/cell triangulation).
   // Skipped entirely when the device is on the office Wi-Fi network.
+  // Sets isVerifyingLocation=true while the check is in progress so buttons show a spinner.
   function verifyLocationThenRun(onAllow: () => void) {
     // Office Wi-Fi bypass — server confirmed this IP is the office public IP
     if (onOfficeNetwork) {
@@ -179,6 +181,8 @@ function App() {
       return;
     }
 
+    setIsVerifyingLocation(true);
+
     function attempt(highAccuracy: boolean) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -186,6 +190,7 @@ function App() {
           setUserLocation({ lat: latitude, lng: longitude });
           const distance = haversineMeters(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
           console.log(`[LocationCheck] distance=${Math.round(distance)}m, limit=${OFFICE_RADIUS_M}m, highAccuracy=${highAccuracy}`);
+          setIsVerifyingLocation(false);
           if (distance > OFFICE_RADIUS_M) {
             alert('Access restricted to showroom location.');
           } else {
@@ -201,6 +206,7 @@ function App() {
             return;
           }
           // Both attempts failed — show a specific message based on the error type.
+          setIsVerifyingLocation(false);
           setLocationDenied(true);
           if (error.code === error.PERMISSION_DENIED) {
             alert(
@@ -942,6 +948,7 @@ function App() {
       onRevisit={() => verifyLocationThenRun(() => setView('revisit-lookup'))}
       onStaff2Login={() => setView('staff2-login')}
       locationDenied={locationDenied && !onOfficeNetwork}
+      isVerifyingLocation={isVerifyingLocation}
     />
   );
 }

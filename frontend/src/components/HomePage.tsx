@@ -9,9 +9,10 @@ interface HomePageProps {
   onRevisit: () => void;
   onStaff2Login?: () => void;
   locationDenied?: boolean;
+  isVerifyingLocation?: boolean;
 }
 
-export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationDenied }: HomePageProps) {
+export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationDenied, isVerifyingLocation }: HomePageProps) {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black">
       {/* Animated Eagle Background - Desktop Only (fills right side) */}
@@ -104,55 +105,65 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationD
           <div className="flex flex-col sm:flex-row items-start gap-4 max-w-md">
             <button
               onClick={onCustomerCheckIn}
-              disabled={locationDenied}
+              disabled={locationDenied || isVerifyingLocation}
               className="w-full sm:w-auto px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: locationDenied ? '#6b7280' : '#D4A736',
                 color: '#000000',
                 border: 'none',
-                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                cursor: (locationDenied || isVerifyingLocation) ? 'not-allowed' : 'pointer',
                 opacity: locationDenied ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                if (!locationDenied) {
+                if (!locationDenied && !isVerifyingLocation) {
                   e.currentTarget.style.backgroundColor = '#E5B946';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!locationDenied) {
+                if (!locationDenied && !isVerifyingLocation) {
                   e.currentTarget.style.backgroundColor = '#D4A736';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
             >
-              Check-In
+              {isVerifyingLocation ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="btn-spinner btn-spinner-dark" />
+                  Verifying…
+                </span>
+              ) : 'Check-In'}
             </button>
             <button
               onClick={onRevisit}
-              disabled={locationDenied}
+              disabled={locationDenied || isVerifyingLocation}
               className="w-full sm:w-auto px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: 'transparent',
                 border: `1px solid ${locationDenied ? '#6b7280' : '#D4A736'}`,
                 color: locationDenied ? '#6b7280' : '#D4A736',
-                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                cursor: (locationDenied || isVerifyingLocation) ? 'not-allowed' : 'pointer',
                 opacity: locationDenied ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                if (!locationDenied) {
+                if (!locationDenied && !isVerifyingLocation) {
                   e.currentTarget.style.backgroundColor = 'rgba(212, 167, 54, 0.1)';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!locationDenied) {
+                if (!locationDenied && !isVerifyingLocation) {
                   e.currentTarget.style.backgroundColor = 'transparent';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }
               }}
             >
-              Revisiting
+              {isVerifyingLocation ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="btn-spinner btn-spinner-gold" />
+                  Verifying…
+                </span>
+              ) : 'Revisiting'}
             </button>
           </div>
         </div>
@@ -210,31 +221,41 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationD
           <div className="flex flex-col gap-3 max-w-xs mx-auto w-full">
             <button
               onClick={onCustomerCheckIn}
-              disabled={locationDenied}
+              disabled={locationDenied || isVerifyingLocation}
               className="w-full px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: locationDenied ? '#6b7280' : '#D4A736',
                 color: '#000000',
                 border: 'none',
-                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                cursor: (locationDenied || isVerifyingLocation) ? 'not-allowed' : 'pointer',
                 opacity: locationDenied ? 0.5 : 1,
               }}
             >
-              Check-In
+              {isVerifyingLocation ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="btn-spinner btn-spinner-dark" />
+                  Verifying…
+                </span>
+              ) : 'Check-In'}
             </button>
             <button
               onClick={onRevisit}
-              disabled={locationDenied}
+              disabled={locationDenied || isVerifyingLocation}
               className="w-full px-8 py-3.5 rounded-lg text-base font-medium transition-all"
               style={{
                 backgroundColor: 'transparent',
                 border: `1px solid ${locationDenied ? '#6b7280' : '#D4A736'}`,
                 color: locationDenied ? '#6b7280' : '#D4A736',
-                cursor: locationDenied ? 'not-allowed' : 'pointer',
+                cursor: (locationDenied || isVerifyingLocation) ? 'not-allowed' : 'pointer',
                 opacity: locationDenied ? 0.5 : 1,
               }}
             >
-              Revisiting
+              {isVerifyingLocation ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="btn-spinner btn-spinner-gold" />
+                  Verifying…
+                </span>
+              ) : 'Revisiting'}
             </button>
           </div>
         </div>
@@ -340,6 +361,25 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationD
         .nav-link:hover::after {
           width: 100%;
         }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .btn-spinner {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          border-width: 2px;
+          border-style: solid;
+          border-top-color: transparent !important;
+          display: inline-block;
+          animation: spin 0.7s linear infinite;
+          flex-shrink: 0;
+        }
+
+        .btn-spinner-dark  { border-color: #0F0E0C; }
+        .btn-spinner-gold  { border-color: #D4A736; }
       `}</style>
     </div>
   );
