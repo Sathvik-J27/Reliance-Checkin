@@ -93,7 +93,12 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit, locationD
 
           {locationDenied && (
             <div className="mb-4 px-4 py-3 rounded-lg text-sm max-w-md" style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)', border: '1px solid rgba(220, 38, 38, 0.5)', color: '#FCA5A5' }}>
-              Location access is required to check in. Please enable location services in your browser and refresh the page.
+              <strong>Location access is required to check in.</strong>
+              <ul style={{ marginTop: '0.4rem', paddingLeft: '1.2rem', lineHeight: '1.6' }}>
+                <li><strong>Android:</strong> Swipe down → tap <em>Location</em> to turn it on. In Chrome, tap the lock icon → Permissions → Location → Allow.</li>
+                <li><strong>iPhone/iPad:</strong> Settings → Privacy &amp; Security → Location Services → Safari → While Using.</li>
+              </ul>
+              After enabling, refresh the page and try again.
             </div>
           )}
           <div className="flex flex-col sm:flex-row items-start gap-4 max-w-md">

@@ -109,16 +109,44 @@ function App() {
     return '';
   });
 
-  // User geolocation — must be within office radius to check in or revisit
+  // User geolocation — must be within office radius to check in or revisit.
+  // Skipped entirely when the device is on the office Wi-Fi (onOfficeNetwork === true).
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
+  const [onOfficeNetwork, setOnOfficeNetwork] = useState(false);
 
   useEffect(() => {
-    if (!navigator.geolocation) { setLocationDenied(true); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocationDenied(true)
-    );
+    // Check if the device is on the office Wi-Fi (matched by public IP on the server).
+    // If yes, skip geolocation entirely — the backend locationGuard also allows these IPs.
+    fetch('/api/on-office-network')
+      .then(r => r.json())
+      .then(({ onOfficeNetwork: isOffice }) => {
+        setOnOfficeNetwork(!!isOffice);
+        if (isOffice) return; // No geolocation needed
+        if (!navigator.geolocation) { setLocationDenied(true); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => setLocationDenied(true),
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 }
+        );
+        // Proactively detect if permission is already denied (avoids silent failures)
+        navigator.permissions?.query({ name: 'geolocation' }).then(result => {
+          if (result.state === 'denied') setLocationDenied(true);
+          result.addEventListener('change', () => {
+            if (result.state === 'denied') setLocationDenied(true);
+            if (result.state === 'granted') setLocationDenied(false);
+          });
+        }).catch(() => {/* Permissions API not supported — ignore */});
+      })
+      .catch(() => {
+        // Network error — fall back to geolocation as usual
+        if (!navigator.geolocation) { setLocationDenied(true); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => setLocationDenied(true),
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 }
+        );
+      });
   }, []);
 
   const OFFICE_LAT = 40.68334033848859;
@@ -136,30 +164,66 @@ function App() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Requests a fresh live location at the moment of button click, then runs onAllow if within radius
+  // Requests a fresh live location at the moment of button click, then runs onAllow if within radius.
+  // Tries high-accuracy (GPS) first; if that times out or is unavailable (common on old Android/Wi-Fi
+  // tablets indoors), automatically retries with low-accuracy (Wi-Fi/cell triangulation).
+  // Skipped entirely when the device is on the office Wi-Fi network.
   function verifyLocationThenRun(onAllow: () => void) {
+    // Office Wi-Fi bypass — server confirmed this IP is the office public IP
+    if (onOfficeNetwork) {
+      onAllow();
+      return;
+    }
     if (!navigator.geolocation) {
       alert('Location services are not supported by your browser.');
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-        const distance = haversineMeters(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
-        console.log(`[LocationCheck] distance=${Math.round(distance)}m, limit=${OFFICE_RADIUS_M}m`);
-        if (distance > OFFICE_RADIUS_M) {
-          alert('Access restricted to showroom location.');
-        } else {
-          onAllow();
+
+    function attempt(highAccuracy: boolean) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          const distance = haversineMeters(latitude, longitude, OFFICE_LAT, OFFICE_LNG);
+          console.log(`[LocationCheck] distance=${Math.round(distance)}m, limit=${OFFICE_RADIUS_M}m, highAccuracy=${highAccuracy}`);
+          if (distance > OFFICE_RADIUS_M) {
+            alert('Access restricted to showroom location.');
+          } else {
+            onAllow();
+          }
+        },
+        (error) => {
+          console.error(`[LocationCheck] error code=${error.code} msg="${error.message}" highAccuracy=${highAccuracy}`);
+          if (highAccuracy) {
+            // GPS failed (timeout or unavailable) — retry with Wi-Fi/cell triangulation.
+            // This is the common case for old Android tablets and Wi-Fi-only iPads indoors.
+            attempt(false);
+            return;
+          }
+          // Both attempts failed — show a specific message based on the error type.
+          setLocationDenied(true);
+          if (error.code === error.PERMISSION_DENIED) {
+            alert(
+              'Location permission was denied.\n\n' +
+              'Android: tap the lock icon in Chrome\'s address bar → Permissions → Location → Allow. ' +
+              'Also check Settings → Location is ON and set to "High accuracy".\n\n' +
+              'iPhone/iPad: Settings → Privacy & Security → Location Services → Safari/Chrome → While Using.'
+            );
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            alert('Your device could not determine its location. Please ensure Location Services is enabled and try again.');
+          } else {
+            alert('Location request timed out. Please ensure Location Services is enabled, then try again.');
+          }
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 10000 : 20000,
+          maximumAge: 30000,
         }
-      },
-      () => {
-        setLocationDenied(true);
-        alert('Location access is required to check in. Please enable location services and try again.');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      );
+    }
+
+    attempt(true);
   }
 
   // Customer session state (set after customer logs in with phone)
@@ -877,7 +941,7 @@ function App() {
       onStaffLogin={() => setView('staff-login')}
       onRevisit={() => verifyLocationThenRun(() => setView('revisit-lookup'))}
       onStaff2Login={() => setView('staff2-login')}
-      locationDenied={locationDenied}
+      locationDenied={locationDenied && !onOfficeNetwork}
     />
   );
 }
