@@ -14,8 +14,17 @@ const referralSourceSchema = z.object({
   type: z.string().min(1, 'Referral type is required'),
   name: z.string().min(1, 'Referral name is required'),
   phone: z.string().optional(),
+  location: z.string().optional(),
 }).superRefine((val, ctx) => {
-  if (val.type !== 'Fabricator' && (!val.phone || val.phone.trim() === '')) {
+  if (val.type === 'Fabricator') {
+    if ((!val.phone || val.phone.trim() === '') && (!val.location || val.location.trim() === '')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone or location is required for Fabricator',
+        path: ['phone'],
+      });
+    }
+  } else if (!val.phone || val.phone.trim() === '') {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: `Phone is required for ${val.type}`,

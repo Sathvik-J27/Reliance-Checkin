@@ -11,6 +11,7 @@ export interface Step2Data {
     type: string;
     name?: string;
     phone?: string;
+    location?: string;
   }[];
 }
 
@@ -24,12 +25,16 @@ const referralOptions = [
   'Other',
 ];
 
+type FieldErrors = Record<string, { name?: string; phone?: string; location?: string; phoneOrLocation?: string }>;
+
 export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props) {
   const [selectedSources, setSelectedSources] = useState<string[]>(initialData?.referralSources?.map(source => source.type) || []);
-  const [referralDetails, setReferralDetails] = useState<Record<string, { name: string; phone: string }>>(initialData?.referralSources?.reduce((acc, source) => {
-    acc[source.type] = { name: source.name || '', phone: source.phone || '' };
+  const [referralDetails, setReferralDetails] = useState<Record<string, { name: string; phone: string; location: string }>>(initialData?.referralSources?.reduce((acc, source) => {
+    acc[source.type] = { name: source.name || '', phone: source.phone || '', location: (source as any).location || '' };
     return acc;
-  }, {}) || {});
+  }, {} as Record<string, { name: string; phone: string; location: string }>) || {});
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [noSelectionError, setNoSelectionError] = useState(false);
 
   // Capitalize first letter of each word
   const capitalizeInput = (value: string) => {
@@ -45,52 +50,91 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
       const newDetails = { ...referralDetails };
       delete newDetails[source];
       setReferralDetails(newDetails);
+      const newErrors = { ...fieldErrors };
+      delete newErrors[source];
+      setFieldErrors(newErrors);
     } else {
       setSelectedSources([...selectedSources, source]);
+      setNoSelectionError(false);
     }
   };
 
-  const updateReferralDetail = (source: string, field: 'name' | 'phone', value: string) => {
+  const updateReferralDetail = (source: string, field: 'name' | 'phone' | 'location', value: string) => {
     setReferralDetails({
       ...referralDetails,
       [source]: {
         ...referralDetails[source],
         name: field === 'name' ? value : (referralDetails[source]?.name || ''),
         phone: field === 'phone' ? value : (referralDetails[source]?.phone || ''),
+        location: field === 'location' ? value : (referralDetails[source]?.location || ''),
       },
     });
+    // Clear relevant errors on change
+    if (fieldErrors[source]) {
+      const newErrors = { ...fieldErrors };
+      if (field === 'name') delete newErrors[source].name;
+      if (field === 'phone') {
+        delete newErrors[source].phone;
+        delete newErrors[source].phoneOrLocation;
+      }
+      if (field === 'location') delete newErrors[source].phoneOrLocation;
+      setFieldErrors(newErrors);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate: At least one source must be selected
+
     if (selectedSources.length === 0) {
-      alert('Please select at least one option');
+      setNoSelectionError(true);
       return;
     }
-    
-    // Validate: Each selected source must have a name (and phone unless Fabricator)
+
+    const newErrors: FieldErrors = {};
+    let hasError = false;
+
     for (const source of selectedSources) {
+      newErrors[source] = {};
+
       if (!referralDetails[source]?.name?.trim()) {
-        alert(`Please enter a name for ${source}`);
-        return;
+        newErrors[source].name = 'Name is required';
+        hasError = true;
       }
-      if (source !== 'Fabricator' && !referralDetails[source]?.phone?.trim()) {
-        alert(`Please enter a phone number for ${source}`);
-        return;
+
+      if (source === 'Fabricator') {
+        const phone = referralDetails[source]?.phone?.trim() || '';
+        const hasLocation = referralDetails[source]?.location?.trim();
+        if (!phone && !hasLocation) {
+          newErrors[source].phoneOrLocation = 'Enter a phone number or location';
+          hasError = true;
+        } else if (phone && !/^\d{10}$/.test(phone)) {
+          newErrors[source].phone = 'Phone must be exactly 10 digits';
+          hasError = true;
+        }
+      } else if (!referralDetails[source]?.phone?.trim()) {
+        newErrors[source].phone = 'Phone number is required';
+        hasError = true;
       }
     }
-    
+
+    if (hasError) {
+      setFieldErrors(newErrors);
+      return;
+    }
+
     const data: Step2Data = {
       referralSources: selectedSources.map(source => ({
         type: source,
         name: referralDetails[source]?.name,
         phone: referralDetails[source]?.phone,
+        ...(source === 'Fabricator' && referralDetails[source]?.location ? { location: referralDetails[source].location } : {}),
       })),
     };
     onNext(data);
   };
+
+  const errorStyle = { color: '#f87171', fontSize: '0.75rem', marginTop: '4px' };
+  const inputErrorBorder = '1px solid #f87171';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
@@ -100,6 +144,9 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="space-y-4">
+            {noSelectionError && (
+              <p style={{ ...errorStyle, fontSize: '0.875rem' }}>Please select at least one option</p>
+            )}
             {referralOptions.map((option) => (
               <div key={option}>
                 <label className="flex items-center gap-3 cursor-pointer p-3 sm:p-4 rounded-lg hover:bg-opacity-50 transition-colors" style={{ backgroundColor: selectedSources.includes(option) ? 'var(--color-background)' : 'transparent', border: `1px solid ${selectedSources.includes(option) ? 'var(--color-gold)' : 'var(--color-border)'}` }}>
@@ -115,24 +162,41 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
 
                 {selectedSources.includes(option) && (
                   <div className="ml-6 sm:ml-8 mt-3 space-y-3">
-                    <input
-                      type="text"
-                      value={referralDetails[option]?.name || ''}
-                      onChange={(e) => updateReferralDetail(option, 'name', capitalizeInput(e.target.value))}
-                      placeholder={option === 'Fabricator' ? "Fabricator's Shop Name (required)" : "Name (required)"}
-                      required
-                      className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
-                      style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-                    />
-                    <input
-                      type="tel"
-                      value={referralDetails[option]?.phone || ''}
-                      onChange={(e) => updateReferralDetail(option, 'phone', e.target.value)}
-                      placeholder={option === 'Fabricator' ? "Phone (optional)" : "Phone (required)"}
-                      required={option !== 'Fabricator'}
-                      className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
-                      style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-                    />
+                    <div>
+                      <input
+                        type="text"
+                        value={referralDetails[option]?.name || ''}
+                        onChange={(e) => updateReferralDetail(option, 'name', capitalizeInput(e.target.value))}
+                        placeholder={option === 'Fabricator' ? "Fabricator's Shop Name (required)" : "Name (required)"}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
+                        style={{ backgroundColor: 'var(--color-background)', border: fieldErrors[option]?.name ? inputErrorBorder : '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
+                      />
+                      {fieldErrors[option]?.name && <p style={errorStyle}>{fieldErrors[option].name}</p>}
+                    </div>
+                    <div>
+                      <input
+                        type="tel"
+                        value={referralDetails[option]?.phone || ''}
+                        onChange={(e) => updateReferralDetail(option, 'phone', e.target.value)}
+                        placeholder={option === 'Fabricator' ? "Phone (required if no location)" : "Phone (required)"}
+                        className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
+                        style={{ backgroundColor: 'var(--color-background)', border: (fieldErrors[option]?.phone || fieldErrors[option]?.phoneOrLocation) ? inputErrorBorder : '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
+                      />
+                      {fieldErrors[option]?.phone && <p style={errorStyle}>{fieldErrors[option].phone}</p>}
+                    </div>
+                    {option === 'Fabricator' && (
+                      <div>
+                        <input
+                          type="text"
+                          value={referralDetails[option]?.location || ''}
+                          onChange={(e) => updateReferralDetail(option, 'location', capitalizeInput(e.target.value))}
+                          placeholder="Location (required if no phone)"
+                          className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
+                          style={{ backgroundColor: 'var(--color-background)', border: fieldErrors[option]?.phoneOrLocation ? inputErrorBorder : '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
+                        />
+                        {fieldErrors[option]?.phoneOrLocation && <p style={errorStyle}>{fieldErrors[option].phoneOrLocation}</p>}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
