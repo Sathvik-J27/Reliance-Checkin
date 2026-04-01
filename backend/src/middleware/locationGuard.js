@@ -3,32 +3,18 @@ const ALLOWED_IPS = (process.env.ALLOWED_IPS || '')
   .map(s => s.trim())
   .filter(Boolean);
 
-const OFFICE_LAT = parseFloat(process.env.OFFICE_LAT || '0');
-const OFFICE_LNG = parseFloat(process.env.OFFICE_LNG || '0');
-const OFFICE_RADIUS_M = parseFloat(process.env.OFFICE_RADIUS_METERS || '300');
-
 function normalizeIp(ip) {
   return (ip || '').replace(/^::ffff:/, '');
 }
 
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = d => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
+// Allows requests only from the office Wi-Fi (matched by public IP via ALLOWED_IPS env var).
+// GPS/geolocation is no longer used — access is gated purely by network.
 module.exports = function locationGuard(req, res, next) {
-  // Skip entirely if office coordinates are not configured
-  if (!OFFICE_LAT || !OFFICE_LNG) {
+  // If no IPs are configured, allow everything (dev / unconfigured environment)
+  if (ALLOWED_IPS.length === 0) {
     return next();
   }
 
-  // 1. IP whitelist check
   const rawIp = req.headers['x-forwarded-for']
     ? req.headers['x-forwarded-for'].split(',')[0].trim()
     : req.ip || req.socket.remoteAddress;
@@ -38,28 +24,10 @@ module.exports = function locationGuard(req, res, next) {
     return next();
   }
 
-  // 2. Geolocation check — coordinates must be present
-  const lat = parseFloat(req.body.lat);
-  const lng = parseFloat(req.body.lng);
-
-  if (isNaN(lat) || isNaN(lng)) {
-    console.warn(`[LocationGuard] Blocked: location not shared, ip="${clientIp}"`);
-    return res.status(403).json({
-      success: false,
-      error: 'Location access is required to check in. Please enable location services and try again.',
-      code: 'LOCATION_REQUIRED',
-    });
-  }
-
-  const distance = haversineMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
-  if (distance <= OFFICE_RADIUS_M) {
-    return next();
-  }
-
-  console.warn(`[LocationGuard] GPS rejected: distance=${Math.round(distance)}m from office (limit=${OFFICE_RADIUS_M}m), ip="${clientIp}"`);
+  console.warn(`[LocationGuard] Blocked: ip="${clientIp}" not in office whitelist`);
   res.status(403).json({
     success: false,
-    error: 'Check-in is only available at the Reliance office.',
-    code: 'LOCATION_RESTRICTED',
+    error: 'Check-in is only available on the office network.',
+    code: 'NETWORK_RESTRICTED',
   });
 };

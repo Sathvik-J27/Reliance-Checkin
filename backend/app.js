@@ -38,19 +38,6 @@ app.use('/api', apiLimiter);
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// Office network detection — frontend calls this on load to decide whether to require geolocation.
-// Returns true if the request IP matches one of the ALLOWED_IPS (i.e. office Wi-Fi NAT IP).
-app.get('/api/on-office-network', (req, res) => {
-  const allowedIps = (process.env.ALLOWED_IPS || '')
-    .split(',').map(s => s.trim()).filter(Boolean);
-  if (allowedIps.length === 0) return res.json({ onOfficeNetwork: false });
-  const rawIp = req.headers['x-forwarded-for']
-    ? req.headers['x-forwarded-for'].split(',')[0].trim()
-    : req.ip || req.socket.remoteAddress;
-  const clientIp = (rawIp || '').replace(/^::ffff:/, '');
-  const onOfficeNetwork = allowedIps.some(ip => ip.replace(/^::ffff:/, '') === clientIp);
-  res.json({ onOfficeNetwork });
-});
 
 // API routes
 app.use('/api', checkInRoutes);
