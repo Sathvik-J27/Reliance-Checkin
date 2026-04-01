@@ -108,12 +108,18 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
           newErrors[source].phoneOrLocation = 'Enter a phone number or location';
           hasError = true;
         } else if (phone && !/^\d{10}$/.test(phone)) {
-          newErrors[source].phone = 'Phone must be exactly 10 digits';
+          newErrors[source].phone = 'Phone number must be 10 digits';
           hasError = true;
         }
-      } else if (!referralDetails[source]?.phone?.trim()) {
-        newErrors[source].phone = 'Phone number is required';
-        hasError = true;
+      } else {
+        const phone = referralDetails[source]?.phone?.trim() || '';
+        if (!phone) {
+          newErrors[source].phone = 'Phone number is required';
+          hasError = true;
+        } else if (!/^\d{10}$/.test(phone)) {
+          newErrors[source].phone = 'Phone number must be 10 digits';
+          hasError = true;
+        }
       }
     }
 
