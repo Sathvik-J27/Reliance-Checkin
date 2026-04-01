@@ -65,10 +65,14 @@ export function RevisitCheckInStep2({ referralSources, onNext, onBack }: Revisit
       return;
     }
 
-    // Validate: Each selected source must have a name
+    // Validate: Each selected source must have a name (and phone unless Fabricator)
     for (const source of selectedSources) {
       if (!referralDetails[source]?.name?.trim()) {
         alert(`Please enter a name for ${source}`);
+        return;
+      }
+      if (source !== 'Fabricator' && !referralDetails[source]?.phone?.trim()) {
+        alert(`Please enter a phone number for ${source}`);
         return;
       }
     }
@@ -134,7 +138,8 @@ export function RevisitCheckInStep2({ referralSources, onNext, onBack }: Revisit
                       type="tel"
                       value={referralDetails[option]?.phone || ''}
                       onChange={(e) => updateReferralDetail(option, 'phone', e.target.value)}
-                      placeholder="Phone (optional)"
+                      placeholder={option === 'Fabricator' ? "Phone (optional)" : "Phone (required)"}
+                      required={option !== 'Fabricator'}
                       className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
                       style={{
                         backgroundColor: 'var(--color-background)',

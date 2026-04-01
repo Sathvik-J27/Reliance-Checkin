@@ -14,6 +14,14 @@ const referralSourceSchema = z.object({
   type: z.string().min(1, 'Referral type is required'),
   name: z.string().min(1, 'Referral name is required'),
   phone: z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (val.type !== 'Fabricator' && (!val.phone || val.phone.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Phone is required for ${val.type}`,
+      path: ['phone'],
+    });
+  }
 });
 
 const checkInSchema = z.object({

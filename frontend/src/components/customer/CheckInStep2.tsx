@@ -70,14 +70,14 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
       return;
     }
     
-    // Validate: Each selected source must have a name (and phone if Contractor)
+    // Validate: Each selected source must have a name (and phone unless Fabricator)
     for (const source of selectedSources) {
       if (!referralDetails[source]?.name?.trim()) {
         alert(`Please enter a name for ${source}`);
         return;
       }
-      if (source === 'Contractor' && !referralDetails[source]?.phone?.trim()) {
-        alert('Please enter a phone number for Contractor');
+      if (source !== 'Fabricator' && !referralDetails[source]?.phone?.trim()) {
+        alert(`Please enter a phone number for ${source}`);
         return;
       }
     }
@@ -128,8 +128,8 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
                       type="tel"
                       value={referralDetails[option]?.phone || ''}
                       onChange={(e) => updateReferralDetail(option, 'phone', e.target.value)}
-                      placeholder={option === 'Contractor' ? "Phone (required)" : "Phone (optional)"}
-                      required={option === 'Contractor'}
+                      placeholder={option === 'Fabricator' ? "Phone (optional)" : "Phone (required)"}
+                      required={option !== 'Fabricator'}
                       className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
                       style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
                     />
