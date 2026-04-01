@@ -34,7 +34,7 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Left side: Initial + Customer Info */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Initial Circle */}
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0"
