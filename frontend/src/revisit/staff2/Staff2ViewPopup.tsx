@@ -305,6 +305,11 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
                       Phone: {ref.phone}
                     </p>
                   )}
+                  {ref.location && (
+                    <p className="ml-4 text-sm" style={{ color: 'var(--color-text-gray)' }}>
+                      Location: {ref.location}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

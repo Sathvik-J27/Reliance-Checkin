@@ -681,6 +681,7 @@ export function CustomerPopup({ customer, onClose, onSubmit, onMarkAsHelped, onR
                       </p>
                       {ref.name && <p style={{ color: 'var(--color-text-gray)', fontSize: '14px', marginLeft: '20px' }}>Name: {ref.name}</p>}
                       {ref.phone && <p style={{ color: 'var(--color-text-gray)', fontSize: '14px', marginLeft: '20px' }}>Phone: {ref.phone}</p>}
+                      {ref.location && <p style={{ color: 'var(--color-text-gray)', fontSize: '14px', marginLeft: '20px' }}>Location: {ref.location}</p>}
                     </div>
                   ))
                 ) : (
