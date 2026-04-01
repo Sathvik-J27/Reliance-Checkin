@@ -70,10 +70,14 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
       return;
     }
     
-    // Validate: Each selected source must have a name
+    // Validate: Each selected source must have a name (and phone if Contractor)
     for (const source of selectedSources) {
       if (!referralDetails[source]?.name?.trim()) {
         alert(`Please enter a name for ${source}`);
+        return;
+      }
+      if (source === 'Contractor' && !referralDetails[source]?.phone?.trim()) {
+        alert('Please enter a phone number for Contractor');
         return;
       }
     }
@@ -92,7 +96,7 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
       <div className="w-full max-w-2xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
         <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>Step 2: How Did You Hear About Us?</h1>
-        <p className="text-center mb-6 sm:mb-8 text-base sm:text-lg font-medium" style={{ color: 'var(--color-text-gray)' }}>Select all that apply</p>
+        <p className="text-center mb-6 sm:mb-8 text-base sm:text-lg font-medium" style={{ color: 'var(--color-text-gray)' }}>Select all that applies</p>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="space-y-4">
@@ -115,7 +119,7 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
                       type="text"
                       value={referralDetails[option]?.name || ''}
                       onChange={(e) => updateReferralDetail(option, 'name', capitalizeInput(e.target.value))}
-                      placeholder="Name (required)"
+                      placeholder={option === 'Fabricator' ? "Fabricator's Shop Name (required)" : "Name (required)"}
                       required
                       className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
                       style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
@@ -124,7 +128,8 @@ export function CheckInStep2({ onNext, onBack, initialData }: CheckInStep2Props)
                       type="tel"
                       value={referralDetails[option]?.phone || ''}
                       onChange={(e) => updateReferralDetail(option, 'phone', e.target.value)}
-                      placeholder="Phone (optional)"
+                      placeholder={option === 'Contractor' ? "Phone (required)" : "Phone (optional)"}
+                      required={option === 'Contractor'}
                       className="w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-sm sm:text-base"
                       style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
                     />

@@ -26,7 +26,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
     street: initialData?.street || '',
     suiteUnit: initialData?.suiteUnit || '',
     city: initialData?.city || '',
-    state: initialData?.state || '',
+    state: initialData?.state || 'NJ',
     zip: initialData?.zip || '',
     country: initialData?.country || 'USA',
     phones: initialData?.phones || [''],
@@ -81,8 +81,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
   ];
 
   const handleStateChange = (stateCode: string) => {
-    const zip = stateZipMap[stateCode] || '';
-    setFormData(prev => ({ ...prev, state: stateCode, zip }));
+    setFormData(prev => ({ ...prev, state: stateCode }));
   };
 
   const capitalizeInput = (value: string) =>
