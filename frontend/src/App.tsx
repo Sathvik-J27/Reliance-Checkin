@@ -304,10 +304,8 @@ function App() {
       if (!response.ok) {
         console.error('Check-in API error:', result);
         let errorMsg = 'Check-in failed. Please try again.';
-        if (response.status === 403 && (result.code === 'LOCATION_RESTRICTED' || result.code === 'LOCATION_REQUIRED')) {
-          errorMsg = result.code === 'LOCATION_REQUIRED'
-            ? 'Location access is required to check in. Please enable location services and try again.'
-            : 'Check-in is only available at the Reliance office.';
+        if (response.status === 403) {
+          errorMsg = 'Check-in is only available on the office network. Please connect to the office Wi-Fi.';
         } else if (response.status === 409) {
           errorMsg = result.error;
           setView('customer-step1');
@@ -489,10 +487,8 @@ function App() {
       });
       const result = await response.json();
       if (!response.ok) {
-        if (response.status === 403 && result.code === 'LOCATION_REQUIRED') {
-          alert('Location access is required to check in. Please enable location services and try again.');
-        } else if (response.status === 403 && result.code === 'LOCATION_RESTRICTED') {
-          alert('Check-in is only available at the Reliance office.');
+        if (response.status === 403) {
+          alert('Check-in is only available on the office network. Please connect to the office Wi-Fi.');
         } else {
           alert('Revisit check-in failed. Please try again.');
         }
