@@ -19,7 +19,7 @@ export function CheckInStep3a({ onNext, onBack, initialData }: CheckInStep3aProp
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
       <div className="w-full max-w-2xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '32px' }}>
-        <h1 className="text-center mb-3 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>Step 3: Party Size</h1>
+        <h1 className="text-center mb-3 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>Party Size</h1>
         <p className="text-center mb-8 text-base sm:text-lg" style={{ color: 'var(--color-text-gray)' }}>
           Please let us know who's visiting today
         </p>

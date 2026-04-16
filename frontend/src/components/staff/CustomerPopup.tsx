@@ -98,6 +98,18 @@ interface CustomerPopupProps {
 export function CustomerPopup({ customer, onClose, onSubmit, onMarkAsHelped, onRevisit, staffUsername, isViewOnly, allCheckIns }: CustomerPopupProps) {
   const [currentStep, setCurrentStep] = useState(customer.draft?.step || 1);
   const [editedData, setEditedData] = useState<Partial<CheckIn>>(customer.draft?.editedCustomerData || {});
+
+  // Single full-name edit field (split into firstName/lastName on change)
+  const [editFullName, setEditFullName] = useState(() => {
+    const fn = customer.draft?.editedCustomerData?.firstName ?? customer.firstName;
+    const ln = customer.draft?.editedCustomerData?.lastName ?? customer.lastName;
+    return [fn, ln].filter(Boolean).join(' ');
+  });
+  const handleFullNameChange = (value: string) => {
+    setEditFullName(value);
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    setEditedData(prev => ({ ...prev, firstName: parts[0] || value.trim(), lastName: parts.slice(1).join(' ') }));
+  };
   const [selectedFabricator, setSelectedFabricator] = useState<Fabricator | undefined>(customer.draft?.selectedFabricator);
   const [materialsList, setMaterialsList] = useState<Material[]>(customer.draft?.materials || []);
   // Use currentlyHelpedBy if it exists (someone clicked View), otherwise use draft helpedBy or logged-in user
@@ -358,7 +370,7 @@ export function CustomerPopup({ customer, onClose, onSubmit, onMarkAsHelped, onR
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 style={{ color: 'var(--color-gold)' }}>
-              {currentData.firstName} {currentData.lastName}
+              {[currentData.firstName, currentData.lastName].filter(Boolean).join(' ')}
             </h2>
             <p style={{ color: 'var(--color-text-gray)', fontSize: '14px' }}>
               Step {currentStep} of 3
@@ -389,27 +401,15 @@ export function CustomerPopup({ customer, onClose, onSubmit, onMarkAsHelped, onR
           <div className="space-y-6">
             <h3 style={{ color: 'var(--color-text-white)' }}>Customer Details</h3>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block mb-2" style={{ color: 'var(--color-text-gray)' }}>First Name</label>
-                <input
-                  type="text"
-                  value={editedData.firstName ?? currentData.firstName}
-                  onChange={(e) => setEditedData({ ...editedData, firstName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg"
-                  style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-                />
-              </div>
-              <div>
-                <label className="block mb-2" style={{ color: 'var(--color-text-gray)' }}>Last Name</label>
-                <input
-                  type="text"
-                  value={editedData.lastName ?? currentData.lastName}
-                  onChange={(e) => setEditedData({ ...editedData, lastName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg"
-                  style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-                />
-              </div>
+            <div>
+              <label className="block mb-2" style={{ color: 'var(--color-text-gray)' }}>Full Name</label>
+              <input
+                type="text"
+                value={editFullName}
+                onChange={(e) => handleFullNameChange(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg"
+                style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
+              />
             </div>
 
             <div>

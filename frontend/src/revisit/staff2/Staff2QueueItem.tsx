@@ -47,7 +47,7 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <p className="font-medium whitespace-nowrap" style={{ color: 'var(--color-text-white)' }}>
-                {customer.firstName} {customer.lastName}
+                {[customer.firstName, customer.lastName].filter(Boolean).join(' ')}
               </p>
               <p className="text-sm whitespace-nowrap" style={{ color: 'var(--color-text-gray)' }}>
                 {customer.phones?.[0] || 'No phone'}

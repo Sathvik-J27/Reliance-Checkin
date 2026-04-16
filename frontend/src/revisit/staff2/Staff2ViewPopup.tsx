@@ -8,9 +8,10 @@ interface Staff2ViewPopupProps {
 }
 
 export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupProps) {
+  const [fullName, setFullName] = useState(
+    [customer.firstName, customer.lastName].filter(Boolean).join(' ')
+  );
   const [formData, setFormData] = useState({
-    firstName: customer.firstName || '',
-    lastName: customer.lastName || '',
     street: customer.street || '',
     suiteUnit: customer.suiteUnit || '',
     city: customer.city || '',
@@ -81,13 +82,14 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
   }, [customer.phones]);
 
   const handleSave = () => {
-    // Basic validation
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      alert('First name and last name are required');
+    if (!fullName.trim()) {
+      alert('Full name is required');
       return;
     }
-
-    onSave(customer.id, formData);
+    const nameParts = fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ');
+    onSave(customer.id, { firstName, lastName, ...formData });
   };
 
   return (
@@ -101,7 +103,7 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 className="text-2xl" style={{ color: 'var(--color-gold)' }}>
-              {customer.firstName} {customer.lastName}
+              {[customer.firstName, customer.lastName].filter(Boolean).join(' ')}
             </h2>
             <p className="text-sm mt-1" style={{ color: 'var(--color-text-gray)' }}>
               {customer.isRevisit ? 'Revisiting Customer' : 'First Time Customer'}
@@ -122,32 +124,17 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
             Customer Information
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block mb-2 text-sm" style={{ color: 'var(--color-text-gray)' }}>
-                First Name *
-              </label>
-              <input
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: capitalizeInput(e.target.value) })}
-                className="w-full px-4 py-2 rounded-lg"
-                style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm" style={{ color: 'var(--color-text-gray)' }}>
-                Last Name *
-              </label>
-              <input
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: capitalizeInput(e.target.value) })}
-                className="w-full px-4 py-2 rounded-lg"
-                style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-              />
-            </div>
+          <div className="mb-4">
+            <label className="block mb-2 text-sm" style={{ color: 'var(--color-text-gray)' }}>
+              Full Name *
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(capitalizeInput(e.target.value))}
+              className="w-full px-4 py-2 rounded-lg"
+              style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
+            />
           </div>
 
           <div className="mb-4">

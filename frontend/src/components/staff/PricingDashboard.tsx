@@ -587,7 +587,7 @@ export function PricingDashboard({ username, onLogout, checkIns, fabricators, on
                       >
                         <td className="p-4">
                           <div style={{ color: 'var(--color-text-white)' }}>
-                            {checkIn.firstName} {checkIn.lastName}
+                            {[checkIn.firstName, checkIn.lastName].filter(Boolean).join(' ')}
                           </div>
                           <div className="text-sm" style={{ color: 'var(--color-text-gray)' }}>
                             {checkIn.phones?.[0]}

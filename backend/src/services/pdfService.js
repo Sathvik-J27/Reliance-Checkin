@@ -230,7 +230,7 @@ async function generateWaiverPDF(checkInData) {
     : `${checkInData.street}, ${checkInData.city}, ${checkInData.state} ${checkInData.zip}`;
 
   const infoLines = [
-    `Customer Name:  ${checkInData.firstName} ${checkInData.lastName}`,
+    `Customer Name:  ${[checkInData.firstName, checkInData.lastName].filter(Boolean).join(' ')}`,
     `Address:        ${addressFull}`,
     `Country:        ${checkInData.country}`,
     `Phone(s):       ${checkInData.phones.join(', ')}`,

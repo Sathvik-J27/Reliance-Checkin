@@ -244,7 +244,7 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="w-full max-w-3xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>
-            {isMainVisitor ? 'Step 3: Waiver' : 'Waiver Agreement'}
+            Waiver Agreement
           </h1>
         <p className="text-center mb-6 text-base sm:text-lg" style={{ color: 'var(--color-text-gray)' }}>
           {isMainVisitor ? 'Please read and sign the waiver' : 'Please review and provide your signature'}

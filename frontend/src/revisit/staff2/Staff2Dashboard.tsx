@@ -402,7 +402,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-medium" style={{ color: 'var(--color-text-white)' }}>
-                              {customer.firstName} {customer.lastName}
+                              {[customer.firstName, customer.lastName].filter(Boolean).join(' ')}
                             </p>
                             <span
                               className="px-2 py-0.5 rounded text-xs"

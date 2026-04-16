@@ -136,8 +136,8 @@ function App() {
   }, []);
 
   const handleStep1Next = (data: Step1Data) => {
-    setCurrentCheckIn({ ...currentCheckIn, ...data });
-    setView('customer-step2');
+    setCurrentCheckIn({ ...currentCheckIn, ...data, referralSources: [] });
+    setView('customer-step3a');
   };
 
   const handleStep2Next = (data: Step2Data) => {
@@ -251,7 +251,7 @@ function App() {
     // Compile all visitor data
     const allVisitors = [
       {
-        name: `${currentCheckIn.firstName} ${currentCheckIn.lastName}`,
+        name: [currentCheckIn.firstName, currentCheckIn.lastName].filter(Boolean).join(' '),
         signature: finalMainSignature?.signature || '',
         isMain: true,
         isMinor: false,
@@ -618,7 +618,7 @@ function App() {
     return (
       <>{loadingOverlay}<CheckInStep3a
         onNext={handleStep3aNext}
-        onBack={() => setView('customer-step2')}
+        onBack={() => setView('customer-step1')}
         initialData={partySize}
       /></>
     );
@@ -671,7 +671,7 @@ function App() {
   if (view === 'customer-step4') {
     return (
       <CheckInStep4
-        customerName={`${currentCheckIn.firstName} ${currentCheckIn.lastName}`}
+        customerName={[currentCheckIn.firstName, currentCheckIn.lastName].filter(Boolean).join(' ')}
         hasMinors={checkInHasMinors}
         onReturnHome={handleReturnHome}
       />
@@ -755,7 +755,7 @@ function App() {
   if (view === 'revisit-waiver') {
     return (
       <>{loadingOverlay}<RevisitWaiver
-        customerName={`${revisitCustomer?.firstName} ${revisitCustomer?.lastName}`}
+        customerName={[revisitCustomer?.firstName, revisitCustomer?.lastName].filter(Boolean).join(' ')}
         onSubmit={handleRevisitWaiverSubmit}
         onBack={() => setView('revisit-step2')}
       /></>
@@ -765,7 +765,7 @@ function App() {
   if (view === 'revisit-confirmation') {
     return (
       <RevisitConfirmation
-        customerName={`${revisitCustomer?.firstName} ${revisitCustomer?.lastName}`}
+        customerName={[revisitCustomer?.firstName, revisitCustomer?.lastName].filter(Boolean).join(' ')}
         onReturnHome={handleReturnHome}
       />
     );

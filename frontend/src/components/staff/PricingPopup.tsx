@@ -69,7 +69,7 @@ export function PricingPopup({ customer, onClose, onComplete }: PricingPopupProp
     setTimeout(() => {
       console.log('Sending quote to fabricator:', customer.draft?.selectedFabricator);
       console.log('Quote details:', {
-        customer: `${customer.firstName} ${customer.lastName}`,
+        customer: [customer.firstName, customer.lastName].filter(Boolean).join(' '),
         selectionSheetNumber: customer.draft?.selectionSheetNumber,
         materials: materials.map(m => ({
           quantity: m.quantity,
@@ -102,7 +102,7 @@ export function PricingPopup({ customer, onClose, onComplete }: PricingPopupProp
               Quote
             </h2>
             <p className="text-sm" style={{ color: 'var(--color-text-gray)' }}>
-              {customer.firstName} {customer.lastName} • Sheet #{customer.draft?.selectionSheetNumber}
+              {[customer.firstName, customer.lastName].filter(Boolean).join(' ')} • Sheet #{customer.draft?.selectionSheetNumber}
             </p>
           </div>
           <button
@@ -120,7 +120,7 @@ export function PricingPopup({ customer, onClose, onComplete }: PricingPopupProp
           <div className="grid grid-cols-2 gap-4 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}>
             <div>
               <p className="text-sm mb-1" style={{ color: 'var(--color-text-gray)' }}>Customer</p>
-              <p style={{ color: 'var(--color-text-white)' }}>{customer.firstName} {customer.lastName}</p>
+              <p style={{ color: 'var(--color-text-white)' }}>{[customer.firstName, customer.lastName].filter(Boolean).join(' ')}</p>
             </div>
             <div>
               <p className="text-sm mb-1" style={{ color: 'var(--color-text-gray)' }}>Fabricator</p>

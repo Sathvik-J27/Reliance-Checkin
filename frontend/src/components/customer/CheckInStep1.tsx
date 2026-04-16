@@ -20,9 +20,13 @@ export interface Step1Data {
 }
 
 export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
-  const [formData, setFormData] = useState<Step1Data>({
-    firstName: initialData?.firstName || '',
-    lastName: initialData?.lastName || '',
+  // Combine existing firstName/lastName into a single fullName field for new check-ins
+  const initialFullName = initialData?.firstName
+    ? [initialData.firstName, initialData.lastName].filter(Boolean).join(' ')
+    : '';
+
+  const [fullName, setFullName] = useState(initialFullName);
+  const [formData, setFormData] = useState<Omit<Step1Data, 'firstName' | 'lastName'>>({
     street: initialData?.street || '',
     suiteUnit: initialData?.suiteUnit || '',
     city: initialData?.city || '',
@@ -100,8 +104,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim())  newErrors.lastName  = 'Last name is required';
+    if (!fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!formData.street.trim())    newErrors.street    = 'Street address is required';
     if (!formData.city.trim())      newErrors.city      = 'City is required';
     if (!formData.state.trim())     newErrors.state     = 'State is required';
@@ -122,7 +125,12 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
+      const nameParts = fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ');
       onNext({
+        firstName,
+        lastName,
         ...formData,
         phones: formData.phones.filter(p => p.trim()),
         emails: formData.emails.filter(e => e.trim()),
@@ -145,34 +153,19 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
         <p className="text-center mb-6 text-sm" style={{ color: 'var(--color-text-gray)' }}>Please provide your contact information</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* First Name */}
+          {/* Full Name */}
           <div>
-            <label className="block mb-1.5 text-sm" style={{ color: 'var(--color-text-white)' }}>First Name *</label>
+            <label className="block mb-1.5 text-sm" style={{ color: 'var(--color-text-white)' }}>Full Name *</label>
             <input
               type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-              onBlur={(e) => setFormData(prev => ({ ...prev, firstName: capitalizeInput(e.target.value) }))}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              onBlur={(e) => setFullName(capitalizeInput(e.target.value))}
               className="w-full px-3 py-2.5 rounded-lg text-sm"
-              style={{ backgroundColor: 'var(--color-background)', border: `1px solid ${errors.firstName ? 'var(--color-error)' : 'var(--color-border)'}`, color: 'var(--color-text-white)' }}
-              placeholder="First name"
+              style={{ backgroundColor: 'var(--color-background)', border: `1px solid ${errors.fullName ? 'var(--color-error)' : 'var(--color-border)'}`, color: 'var(--color-text-white)' }}
+              placeholder="First and last name"
             />
-            {errors.firstName && <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{errors.firstName}</p>}
-          </div>
-
-          {/* Last Name */}
-          <div>
-            <label className="block mb-1.5 text-sm" style={{ color: 'var(--color-text-white)' }}>Last Name *</label>
-            <input
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-              onBlur={(e) => setFormData(prev => ({ ...prev, lastName: capitalizeInput(e.target.value) }))}
-              className="w-full px-3 py-2.5 rounded-lg text-sm"
-              style={{ backgroundColor: 'var(--color-background)', border: `1px solid ${errors.lastName ? 'var(--color-error)' : 'var(--color-border)'}`, color: 'var(--color-text-white)' }}
-              placeholder="Last name"
-            />
-            {errors.lastName && <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{errors.lastName}</p>}
+            {errors.fullName && <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{errors.fullName}</p>}
           </div>
 
           {/* Street Address */}
@@ -189,19 +182,6 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
               ref={streetInputRef}
             />
             {errors.street && <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{errors.street}</p>}
-          </div>
-
-          {/* Suite/Unit */}
-          <div>
-            <label className="block mb-1.5 text-sm" style={{ color: 'var(--color-text-white)' }}>Suite/Unit</label>
-            <input
-              type="text"
-              value={formData.suiteUnit}
-              onChange={(e) => setFormData(prev => ({ ...prev, suiteUnit: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-lg text-sm"
-              style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
-              placeholder="Suite/Unit"
-            />
           </div>
 
           {/* City */}
@@ -348,7 +328,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
             className="w-full py-3.5 rounded-lg text-sm font-medium mt-6"
             style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-background)' }}
           >
-            Continue to Step 2
+            Continue
           </button>
         </form>
       </div>

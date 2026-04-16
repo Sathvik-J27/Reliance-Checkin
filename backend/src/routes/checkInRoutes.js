@@ -199,7 +199,7 @@ router.post('/check-ins/:id/complete', async (req, res, next) => {
     }
 
     // ── Steps 3-4: PDF + email (best-effort, decoupled) ───────────────────
-    const customerName = `${record.first_name} ${record.last_name}`;
+    const customerName = [record.first_name, record.last_name].filter(Boolean).join(' ');
     // Normalise emails: supabase returns JSONB as an array, but guard against strings
     const rawEmails = record.emails;
     const customerEmails = Array.isArray(rawEmails)

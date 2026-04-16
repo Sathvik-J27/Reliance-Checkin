@@ -282,7 +282,7 @@ export function StaffDashboard({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium truncate" style={{ color: 'var(--color-text-white)' }}>
-                          {checkIn.firstName} {checkIn.lastName}
+                          {[checkIn.firstName, checkIn.lastName].filter(Boolean).join(' ')}
                         </span>
                         {checkIn.currentlyHelpedBy ? (
                           <span 
@@ -483,7 +483,7 @@ export function StaffDashboard({
                               {customer.draft?.selectionSheetNumber || '-'}
                             </td>
                             <td className="px-4 py-4" style={{ color: 'var(--color-text-white)', fontSize: '14px' }}>
-                              {customer.firstName} {customer.lastName}
+                              {[customer.firstName, customer.lastName].filter(Boolean).join(' ')}
                             </td>
                             <td className="px-4 py-4" style={{ color: 'var(--color-text-gray)', fontSize: '14px' }}>
                               {customer.phones[0] || '-'}
