@@ -1,19 +1,22 @@
 import React from 'react';
 
+const STAFF_NAMES = [
+  'Katia', 'Diane', 'Sarah', 'Ben', 'Dheeraj', 'Om', 'Raj',
+  'Alana', 'Aman', 'Maria', 'Susheel', 'Harsh', 'Walter', 'Olivia',
+];
+
 interface Staff2QueueItemProps {
   customer: any;
   currentUsername: string;
   onView: (customer: any) => void;
   onDone: (customerId: string) => void;
-  onAttend: (customerId: string) => void;
+  onAssign: (customerId: string, staffName: string) => void;
 }
 
-export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onAttend }: Staff2QueueItemProps) {
+export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onAssign }: Staff2QueueItemProps) {
   const totalVisitors = (customer.partySize?.adults || 0) + (customer.partySize?.minors || 0);
   const isRevisit = customer.isRevisit === true;
-  const attendingBy: string | null = customer.currentlyHelpedBy || null;
-  const isAttendingByMe = attendingBy === currentUsername;
-  const isAttendingByOther = attendingBy && !isAttendingByMe;
+  const assignedTo: string = customer.currentlyHelpedBy || '';
 
   const formatTime = (dateValue: any) => {
     if (!dateValue) return '';
@@ -27,8 +30,8 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
       className="p-4 rounded-lg"
       style={{
         backgroundColor: 'var(--color-card)',
-        border: isAttendingByOther
-          ? '1px solid rgba(212, 167, 54, 0.5)'
+        border: assignedTo
+          ? '1px solid rgba(34, 197, 94, 0.4)'
           : '1px solid var(--color-border)',
       }}
     >
@@ -70,10 +73,10 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
                 </p>
               )}
             </div>
-            {/* Attending by label */}
-            {attendingBy && (
-              <p className="text-xs" style={{ color: isAttendingByMe ? '#22C55E' : 'var(--color-gold)' }}>
-                {isAttendingByMe ? '✓ You are attending' : `Being attended by ${attendingBy}`}
+            {/* Assigned label */}
+            {assignedTo && (
+              <p className="text-xs" style={{ color: '#22C55E' }}>
+                ✓ Assigned to {assignedTo}
               </p>
             )}
           </div>
@@ -81,20 +84,32 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
 
         {/* Right side: Action Buttons */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Attend button */}
-          <button
-            onClick={() => !isAttendingByMe && onAttend(customer.id)}
-            className="px-4 py-2 rounded-lg font-medium whitespace-nowrap"
-            style={
-              isAttendingByMe
-                ? { backgroundColor: 'rgba(34, 197, 94, 0.15)', border: '1px solid #22C55E', color: '#22C55E' }
-                : isAttendingByOther
-                ? { backgroundColor: 'rgba(212, 167, 54, 0.1)', border: '1px solid var(--color-border)', color: 'var(--color-gold)', cursor: 'default' }
-                : { backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }
-            }
+          {/* Staff assignment dropdown */}
+          <select
+            value={assignedTo}
+            onChange={(e) => onAssign(customer.id, e.target.value)}
+            className="px-3 py-2 rounded-lg font-medium"
+            style={{
+              backgroundColor: assignedTo ? 'rgba(34, 197, 94, 0.1)' : 'var(--color-background)',
+              border: assignedTo ? '1px solid #22C55E' : '1px solid var(--color-border)',
+              color: assignedTo ? '#22C55E' : 'var(--color-text-white)',
+              cursor: 'pointer',
+            }}
           >
-            {isAttendingByMe ? 'Attending' : isAttendingByOther ? 'Attending' : 'Attend'}
-          </button>
+            <option value="" style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text-white)' }}>
+              — Assign —
+            </option>
+            {STAFF_NAMES.map(name => (
+              <option
+                key={name}
+                value={name}
+                style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text-white)' }}
+              >
+                {name}
+              </option>
+            ))}
+          </select>
+
           <button
             onClick={() => onView(customer)}
             className="px-4 py-2 rounded-lg font-medium whitespace-nowrap"
@@ -121,3 +136,5 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
     </div>
   );
 }
+
+export { STAFF_NAMES };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
-import { Staff2QueueItem } from './Staff2QueueItem';
+import { Staff2QueueItem, STAFF_NAMES } from './Staff2QueueItem';
 import { Staff2ViewPopup } from './Staff2ViewPopup';
 import logo from 'figma:asset/5ebff9a217654d307f5ff0e6abe952a2f7edba47.png';
 
@@ -94,12 +94,18 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
 
   const handleDone = async (customerId: string) => {
     const now = new Date().toISOString();
+    const customer = allCheckIns.find(c => c.id === customerId);
+    const helpedBy = customer?.currentlyHelpedBy || null;
     // Optimistic update — set helpedTime so history date filter matches immediately
     setAllCheckIns(prev =>
-      prev.map(c => c.id === customerId ? { ...c, status: 'done', helpedTime: now } : c)
+      prev.map(c => c.id === customerId ? { ...c, status: 'done', helpedTime: now, helpedBy } : c)
     );
     try {
-      await fetch(`/api/check-ins/${customerId}/done`, { method: 'PATCH' });
+      await fetch(`/api/check-ins/${customerId}/done`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helpedBy }),
+      });
       // SSE broadcast will confirm with authoritative server data
     } catch {
       // Revert optimistic update on failure
@@ -110,26 +116,18 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
     onMarkAsDone(customerId); // sync App.tsx state for other views
   };
 
-  const handleAttend = async (customerId: string) => {
+  const handleAssign = async (customerId: string, staffName: string) => {
+    // Optimistic update
+    setAllCheckIns(prev =>
+      prev.map(c => c.id === customerId ? { ...c, currentlyHelpedBy: staffName || null } : c)
+    );
     try {
-      const res = await fetch(`/api/check-ins/${customerId}/claim`, {
+      await fetch(`/api/check-ins/${customerId}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ helpedBy: username }),
+        body: JSON.stringify({ helpedBy: staffName }),
       });
-      const json = await res.json();
-
-      if (json.claimed) {
-        // Optimistic update — SSE will confirm with authoritative data
-        setAllCheckIns(prev =>
-          prev.map(c => c.id === customerId ? { ...c, currentlyHelpedBy: username } : c)
-        );
-      } else if (json.claimedBy) {
-        // Another staff member already claimed this customer
-        setAllCheckIns(prev =>
-          prev.map(c => c.id === customerId ? { ...c, currentlyHelpedBy: json.claimedBy } : c)
-        );
-      }
+      // SSE broadcast will confirm with authoritative data
     } catch {
       // Network error — SSE will resync state on reconnect
     }
@@ -144,6 +142,16 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
   const totalVisitors = historyCustomers.length;
   const newCustomers = historyCustomers.filter(c => !c.isRevisit).length;
   const revisits = historyCustomers.filter(c => c.isRevisit).length;
+
+  // Per-staff helped counts for the selected date
+  const staffStats: Record<string, number> = {};
+  for (const c of historyCustomers) {
+    const name = c.helpedBy;
+    if (name) staffStats[name] = (staffStats[name] || 0) + 1;
+  }
+  const staffStatsSorted = STAFF_NAMES
+    .filter(name => staffStats[name])
+    .map(name => ({ name, count: staffStats[name] }));
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -233,7 +241,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                     currentUsername={username}
                     onView={handleView}
                     onDone={handleDone}
-                    onAttend={handleAttend}
+                    onAssign={handleAssign}
                   />
                 ))}
               </div>
@@ -331,7 +339,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
 
               {/* Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div 
+                <div
                   className="p-4 rounded-lg"
                   style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)' }}
                 >
@@ -343,7 +351,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </p>
                 </div>
 
-                <div 
+                <div
                   className="p-4 rounded-lg"
                   style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)' }}
                 >
@@ -355,7 +363,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </p>
                 </div>
 
-                <div 
+                <div
                   className="p-4 rounded-lg"
                   style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)' }}
                 >
@@ -367,6 +375,35 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </p>
                 </div>
               </div>
+
+              {/* Staff Summary */}
+              {staffStatsSorted.length > 0 && (
+                <div
+                  className="p-4 rounded-lg mb-6"
+                  style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+                >
+                  <p className="text-sm font-medium mb-3" style={{ color: 'var(--color-text-gray)' }}>
+                    Staff Summary
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {staffStatsSorted.map(({ name, count }) => (
+                      <div
+                        key={name}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                        style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)' }}
+                      >
+                        <span style={{ color: 'var(--color-text-white)' }}>{name}</span>
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs font-bold"
+                          style={{ backgroundColor: 'rgba(212, 167, 54, 0.2)', color: 'var(--color-gold)' }}
+                        >
+                          {count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* History List */}
@@ -414,9 +451,16 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                               {customer.isRevisit ? 'Revisiting' : 'First Time'}
                             </span>
                           </div>
-                          <p className="text-sm" style={{ color: 'var(--color-text-gray)' }}>
-                            {customer.phones?.[0] || 'No phone'}
-                          </p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-sm" style={{ color: 'var(--color-text-gray)' }}>
+                              {customer.phones?.[0] || 'No phone'}
+                            </p>
+                            {customer.helpedBy && (
+                              <p className="text-xs" style={{ color: '#22C55E' }}>
+                                ✓ Helped by {customer.helpedBy}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
 

@@ -129,12 +129,15 @@ async function completeCheckIn(id, { helpedBy, selectionSheetNumber, materials, 
  * Returns the record on success, or null if already claimed by someone else.
  */
 async function claimCheckIn(id, helpedBy) {
+  const updateData = helpedBy
+    ? { currently_helped_by: helpedBy }
+    : { currently_helped_by: null };
+
   const { data: record, error } = await supabase
     .from('check_ins')
-    .update({ currently_helped_by: helpedBy })
+    .update(updateData)
     .eq('id', id)
     .eq('status', 'waiting')
-    .is('currently_helped_by', null)   // atomic: only claim if unclaimed
     .select('id, currently_helped_by')
     .maybeSingle();
 
@@ -142,7 +145,7 @@ async function claimCheckIn(id, helpedBy) {
     throw new Error(`Failed to claim check-in: ${error.message}`);
   }
 
-  return record; // null means someone else already claimed it
+  return record;
 }
 
 /**
@@ -216,13 +219,17 @@ async function getAllCheckIns() {
  * CQRS Command: Mark a check-in as done (Staff2 queue management).
  * Simple status update — no selection data required.
  */
-async function markAsDone(id) {
+async function markAsDone(id, helpedBy) {
+  const updateData = {
+    status:      'done',
+    helped_time: new Date().toISOString(),
+    currently_helped_by: null,
+  };
+  if (helpedBy) updateData.helped_by = helpedBy;
+
   const { error } = await supabase
     .from('check_ins')
-    .update({
-      status:      'done',
-      helped_time: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id);
 
   if (error) {

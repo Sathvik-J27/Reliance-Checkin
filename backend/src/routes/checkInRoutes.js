@@ -299,7 +299,8 @@ router.patch('/check-ins/:id/done', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Invalid check-in ID format' });
     }
 
-    await markAsDone(id);
+    const { helpedBy } = req.body || {};
+    await markAsDone(id, helpedBy || null);
 
     // Push update to all open staff dashboards (fire-and-forget)
     broadcastAll().catch(() => {});
@@ -358,26 +359,11 @@ router.post('/check-ins/:id/claim', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'helpedBy is required' });
     }
 
-    const record = await claimCheckIn(id, helpedBy);
+    await claimCheckIn(id, helpedBy);
 
-    if (record) {
-      // Claim succeeded — broadcast so other dashboards see the attending label immediately
-      broadcastAll().catch(() => {});
-      return res.status(200).json({ success: true, claimed: true });
-    }
-
-    // Claim failed — fetch who has it so the frontend can show a message
-    const { data: existing } = await require('../config/supabase')
-      .from('check_ins')
-      .select('currently_helped_by')
-      .eq('id', id)
-      .single();
-
-    return res.status(200).json({
-      success: true,
-      claimed: false,
-      claimedBy: existing?.currently_helped_by || null,
-    });
+    // Broadcast so other dashboards see the assignment immediately
+    broadcastAll().catch(() => {});
+    return res.status(200).json({ success: true, claimed: true });
   } catch (err) {
     next(err);
   }

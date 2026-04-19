@@ -288,6 +288,7 @@ export function HomePage({ onCustomerCheckIn, onStaffLogin, onRevisit }: HomePag
           position: relative;
           text-decoration: none;
           padding-bottom: 2px;
+          outline: none;
         }
 
         .nav-link::after {
