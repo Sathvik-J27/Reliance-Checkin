@@ -342,7 +342,7 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
               className="w-full sm:flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base"
               style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-background)' }}
             >
-              Submit
+              Continue
             </button>
           </div>
         </form>

@@ -7,10 +7,13 @@ interface CheckInStep3cProps {
   visitorNumber: number;
   totalAdults: number;
   initialData?: { name: string; signature: string };
+  primaryVisitorName: string;
+  takenNames: string[];
 }
 
-export function CheckInStep3c({ onNext, onBack, visitorNumber, totalAdults, initialData }: CheckInStep3cProps) {
+export function CheckInStep3c({ onNext, onBack, visitorNumber, totalAdults, initialData, primaryVisitorName, takenNames }: CheckInStep3cProps) {
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
   const [signatureData, setSignatureData] = useState<string>('');
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -130,12 +133,20 @@ export function CheckInStep3c({ onNext, onBack, visitorNumber, totalAdults, init
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name.trim()) {
       alert('Please enter the visitor\'s name');
       return;
     }
-    
+
+    const trimmed = name.trim().toLowerCase();
+    const allTaken = [primaryVisitorName, ...takenNames].map(n => n.trim().toLowerCase());
+    if (allTaken.includes(trimmed)) {
+      setNameError("It looks like you've entered your own name. Please enter the name of the additional visitor instead.");
+      return;
+    }
+    setNameError('');
+
     if (!signatureData) {
       alert('Please provide a signature');
       return;
@@ -154,29 +165,38 @@ export function CheckInStep3c({ onNext, onBack, visitorNumber, totalAdults, init
           </h1>
         </div>
         
-        <p className="text-center mb-6 text-base sm:text-lg" style={{ color: 'var(--color-text-gray)' }}>
+        <p className="text-center mb-4 text-base sm:text-lg" style={{ color: 'var(--color-text-gray)' }}>
           Please provide name and signature
         </p>
+
+        <div className="flex items-start gap-3 mb-6 p-4 rounded-lg" style={{ backgroundColor: 'rgba(212, 167, 54, 0.15)', border: '1px solid var(--color-gold)' }}>
+          <p className="text-sm sm:text-base" style={{ color: 'var(--color-gold)' }}>
+            Please hand the device to <strong>Visitor {visitorNumber}</strong> to enter their information.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Name Input */}
           <div className="space-y-2">
             <label className="block text-base" style={{ color: 'var(--color-text-white)' }}>
-              Visitor's Full Name
+              Visitor {visitorNumber}'s Full Name
             </label>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(capitalizeInput(e.target.value))}
-              placeholder="Enter full name"
+              onChange={(e) => { setNameError(''); setName(capitalizeInput(e.target.value)); }}
+              placeholder={`Enter Visitor ${visitorNumber}'s full name`}
               required
               className="w-full px-4 py-3 rounded-lg text-base"
-              style={{ 
-                backgroundColor: 'var(--color-background)', 
-                border: '1px solid var(--color-border)', 
-                color: 'var(--color-text-white)' 
+              style={{
+                backgroundColor: 'var(--color-background)',
+                border: nameError ? '1px solid #ef4444' : '1px solid var(--color-border)',
+                color: 'var(--color-text-white)'
               }}
             />
+            {nameError && (
+              <p className="text-sm mt-1" style={{ color: '#ef4444' }}>{nameError}</p>
+            )}
           </div>
 
           {/* Signature Pad */}
@@ -252,7 +272,7 @@ export function CheckInStep3c({ onNext, onBack, visitorNumber, totalAdults, init
               className="w-full sm:flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base"
               style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-background)' }}
             >
-              {visitorNumber < totalAdults ? 'Next Visitor' : 'Continue'}
+              Continue
             </button>
           </div>
         </form>

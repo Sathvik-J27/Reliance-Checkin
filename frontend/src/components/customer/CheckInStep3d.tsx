@@ -99,7 +99,7 @@ export function CheckInStep3d({ onNext, onBack, numberOfMinors }: CheckInStep3dP
               className="w-full sm:flex-1 py-3 sm:py-4 rounded-lg text-sm sm:text-base"
               style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-background)' }}
             >
-              Complete Check-In
+              Submit
             </button>
           </div>
         </form>

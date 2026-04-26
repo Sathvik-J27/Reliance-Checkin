@@ -647,6 +647,8 @@ function App() {
         visitorNumber={currentAdultIndex + 2}
         totalAdults={partySize.adults}
         initialData={currentVisitorData}
+        primaryVisitorName={`${currentCheckIn.firstName ?? ''} ${currentCheckIn.lastName ?? ''}`.trim()}
+        takenNames={additionalAdultSignatures.slice(0, currentAdultIndex).map(s => s.name)}
       /></>
     );
   }
