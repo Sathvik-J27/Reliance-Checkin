@@ -132,7 +132,7 @@ export function CheckInStep1({ onNext, initialData }: CheckInStep1Props) {
         firstName,
         lastName,
         ...formData,
-        phones: formData.phones.filter(p => p.trim()),
+        phones: formData.phones.filter(p => p.trim()).map(p => p.replace(/\D/g, '')),
         emails: formData.emails.filter(e => e.trim()),
       });
     }

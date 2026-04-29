@@ -309,6 +309,9 @@ function App() {
         } else if (response.status === 409) {
           errorMsg = result.error;
           setView('customer-step1');
+        } else if (response.status === 400) {
+          errorMsg = 'Some information was invalid. Please review and re-enter your details.';
+          setView('customer-step1');
         }
         alert(errorMsg);
         setIsSubmitting(false);

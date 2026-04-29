@@ -84,7 +84,13 @@ const checkInSchema = z.object({
  * Returns { success, data, errors }
  */
 function validateCheckIn(body) {
-  const result = checkInSchema.safeParse(body);
+  const normalized = {
+    ...body,
+    phones: Array.isArray(body.phones)
+      ? body.phones.map(p => (typeof p === 'string' ? p.replace(/\D/g, '') : p))
+      : body.phones,
+  };
+  const result = checkInSchema.safeParse(normalized);
 
   if (!result.success) {
     const errors = result.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
