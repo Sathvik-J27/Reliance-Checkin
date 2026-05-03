@@ -1,7 +1,7 @@
 const express = require('express');
 const locationGuard = require('../middleware/locationGuard');
 const { validateCheckIn } = require('../validators/checkInValidator');
-const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, markAsDone } = require('../services/checkInService');
+const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone } = require('../services/checkInService');
 const { generateWaiverPDF } = require('../services/pdfService');
 const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
@@ -273,13 +273,34 @@ router.post('/check-ins/:id/complete', async (req, res, next) => {
 
 /**
  * GET /api/check-ins
- * Returns all check-ins (waiting + helped) with full staff selection data.
- * Used by the frontend to re-hydrate state after a page refresh.
+ * Returns check-ins without signature data.
+ * ?date=YYYY-MM-DD  → records helped on that date (History tab)
+ * (no param)        → last 2 days of check-ins (queue + recent history / SSE re-hydration)
  */
 router.get('/check-ins', async (req, res, next) => {
   try {
-    const checkIns = await getAllCheckIns();
+    const { date } = req.query;
+    const checkIns = await getAllCheckIns(date ? { date } : undefined);
     return res.status(200).json({ success: true, data: checkIns });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/check-ins/:id
+ * Returns a single check-in with full data including visitor signatures.
+ * Called by the View popup so signatures are only fetched on demand.
+ */
+router.get('/check-ins/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid check-in ID format' });
+    }
+    const checkIn = await getCheckInById(id);
+    return res.status(200).json({ success: true, data: checkIn });
   } catch (err) {
     next(err);
   }

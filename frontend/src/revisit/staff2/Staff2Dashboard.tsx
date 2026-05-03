@@ -28,8 +28,10 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Local snapshot of all check-ins — starts from prop (instant render) then kept fresh by poll
+  // Local snapshot of recent check-ins (last 2 days) — kept fresh by SSE
   const [allCheckIns, setAllCheckIns] = useState<any[]>(checkIns);
+  // Incremented on every SSE update so the history fetch re-runs automatically
+  const [sseUpdateCount, setSseUpdateCount] = useState(0);
 
   // Re-derive queue whenever allCheckIns changes
   useEffect(() => {
@@ -39,29 +41,23 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
     setQueueCustomers(queue);
   }, [allCheckIns]);
 
-  // Re-derive history whenever filters or allCheckIns changes.
-  // Filter by helpedTime (when staff actually processed them) so "today's history"
-  // shows everyone helped today regardless of when they checked in.
+  // Fetch history from the API whenever the selected date changes or an SSE update arrives.
+  // The backend filters by helped_time for the given date, so any date in history works.
   useEffect(() => {
-    if (activeTab === 'history') {
-      const filtered = allCheckIns.filter(c => {
-        if (c.status !== 'done' && c.status !== 'helped') return false;
-        const d = new Date(c.helpedTime || c.checkInTime);
-        return (
-          d.getMonth() + 1 === selectedMonth &&
-          d.getDate() === selectedDay &&
-          d.getFullYear() === selectedYear
-        );
-      });
-      setHistoryCustomers(filtered);
-    }
-  }, [activeTab, selectedMonth, selectedDay, selectedYear, allCheckIns]);
+    if (activeTab !== 'history') return;
+    const month = String(selectedMonth).padStart(2, '0');
+    const day   = String(selectedDay).padStart(2, '0');
+    fetch(`/api/check-ins?date=${selectedYear}-${month}-${day}`)
+      .then(r => r.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data)) setHistoryCustomers(json.data);
+      })
+      .catch(() => {});
+  }, [activeTab, selectedMonth, selectedDay, selectedYear, sseUpdateCount]);
 
-  // Subscribe to real-time updates via SSE instead of polling.
-  // The server pushes the full check-in list after every mutation, so all
-  // staff dashboards update within milliseconds.  EventSource auto-reconnects.
+  // Subscribe to real-time updates via SSE.
+  // The server pushes the recent check-in list after every mutation.
   useEffect(() => {
-    // Initial load
     fetch('/api/check-ins')
       .then(r => r.json())
       .then(json => {
@@ -76,6 +72,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
         const msg = JSON.parse(e.data);
         if (msg.type === 'update' && Array.isArray(msg.data)) {
           setAllCheckIns(msg.data);
+          setSseUpdateCount(c => c + 1);
         }
       } catch { /* ignore malformed messages */ }
     };
@@ -87,9 +84,15 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
     return () => es.close();
   }, []);
 
-  const handleView = (customer: any) => {
+  // Fetch full check-in data (including visitor signatures) on demand when View is clicked.
+  const handleView = async (customer: any) => {
     setSelectedCustomer(customer);
     setShowViewPopup(true);
+    try {
+      const res  = await fetch(`/api/check-ins/${customer.id}`);
+      const json = await res.json();
+      if (json.success && json.data) setSelectedCustomer(json.data);
+    } catch { /* keep the partial data already set */ }
   };
 
   const handleDone = async (customerId: string) => {
