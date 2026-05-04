@@ -83,13 +83,11 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
   });
 
   const [agreed, setAgreed] = useState(initialData?.agreed || false);
-  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(!!initialData); // If coming back, assume scrolled
   const [signatureData, setSignatureData] = useState<string>(initialData?.signature || '');
   const [isDrawing, setIsDrawing] = useState(false);
   const [error, setError] = useState<string>('');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -118,16 +116,6 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
       img.src = initialData.signature;
     }
   }, [initialData]);
-
-  const handleScroll = () => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 10;
-    if (isAtBottom) {
-      setHasScrolledToBottom(true);
-    }
-  };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
@@ -209,11 +197,6 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
       return;
     }
 
-    if (!hasScrolledToBottom) {
-      setError('Please scroll to the bottom of the waiver to continue');
-      return;
-    }
-
     if (!agreed) {
       setError('You must agree to the waiver to continue');
       return;
@@ -241,7 +224,7 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
         onConsent={handleConsentGiven}
       />
 
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)' }}>
+      <div className="min-h-screen flex items-start justify-center p-4 sm:p-6 pt-8 pb-10" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="w-full max-w-3xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>
             Waiver Agreement
@@ -253,13 +236,10 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Waiver Text */}
           <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="p-4 sm:p-6 rounded-lg overflow-y-auto"
+            className="p-4 sm:p-6 rounded-lg"
             style={{
               backgroundColor: 'var(--color-background)',
               border: '1px solid var(--color-border)',
-              maxHeight: '300px',
               color: 'var(--color-text-white)',
               lineHeight: '1.6',
               fontSize: '13px',
@@ -268,22 +248,15 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
             <div style={{ whiteSpace: 'pre-wrap' }}>{waiverText}</div>
           </div>
 
-          {!hasScrolledToBottom && (
-            <p className="text-center text-sm" style={{ color: 'var(--color-gold)' }}>
-              ⬇ Please scroll to the bottom to continue ⬇
-            </p>
-          )}
-
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              disabled={!hasScrolledToBottom}
               className="w-5 h-5 mt-0.5 flex-shrink-0"
               style={{ accentColor: 'var(--color-gold)' }}
             />
-            <span className="text-sm sm:text-base" style={{ color: hasScrolledToBottom ? 'var(--color-text-white)' : 'var(--color-text-gray)' }}>
+            <span className="text-sm sm:text-base" style={{ color: 'var(--color-text-white)' }}>
               I have read and agree to the terms of the waiver
             </span>
           </label>
@@ -314,7 +287,7 @@ export function CheckInStep3b({ onNext, onBack, isMainVisitor = true, initialDat
               style={{
                 backgroundColor: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                height: '180px',
+                height: '220px',
               }}
             />
             <p className="mt-2 text-xs sm:text-sm" style={{ color: 'var(--color-text-gray)' }}>

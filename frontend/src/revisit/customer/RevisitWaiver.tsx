@@ -315,7 +315,7 @@ export function RevisitWaiver({ customerName, onSubmit, onBack }: RevisitWaiverP
   // Main Waiver Step
   if (currentStep === 'main') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ backgroundColor: 'var(--color-background)', overflowY: 'auto' }}>
+      <div className="min-h-screen flex items-start justify-center p-4 sm:p-6 pt-8 pb-10" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="w-full max-w-3xl" style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <h1 className="text-center mb-2 text-2xl sm:text-3xl" style={{ color: 'var(--color-gold)' }}>
             Liability Waiver
@@ -330,8 +330,6 @@ export function RevisitWaiver({ customerName, onSubmit, onBack }: RevisitWaiverP
               style={{
                 backgroundColor: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
-                maxHeight: '300px',
-                overflowY: 'auto',
                 padding: '16px',
                 color: 'var(--color-text-white)',
                 lineHeight: '1.6',
@@ -397,7 +395,7 @@ I HAVE READ THIS COVENANT NOT TO SUE, WAIVER, RELEASE, INFORMED CONSENT, ASSUMPT
               <canvas
                 ref={canvasRef}
                 width={600}
-                height={200}
+                height={220}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
@@ -475,7 +473,7 @@ I HAVE READ THIS COVENANT NOT TO SUE, WAIVER, RELEASE, INFORMED CONSENT, ASSUMPT
               <canvas
                 ref={canvasRef}
                 width={600}
-                height={200}
+                height={220}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
