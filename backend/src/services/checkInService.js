@@ -220,8 +220,17 @@ async function getAllCheckIns({ date } = {}) {
   let query = supabase.from('check_ins').select(LIST_COLUMNS);
 
   if (date) {
-    const dayStart = new Date(`${date}T00:00:00`);
-    const dayEnd   = new Date(`${date}T23:59:59.999`);
+    // Build day boundaries in America/New_York (handles EDT/EST automatically).
+    // helped_time is stored as UTC, so we must compare against UTC equivalents of
+    // Eastern midnight and Eastern end-of-day for the selected date.
+    const probe = new Date(`${date}T12:00:00Z`);
+    const tzParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      timeZoneName: 'longOffset',
+    }).formatToParts(probe);
+    const etOffset = (tzParts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT-05:00').replace('GMT', '');
+    const dayStart = new Date(`${date}T00:00:00${etOffset}`);
+    const dayEnd   = new Date(`${date}T23:59:59.999${etOffset}`);
     query = query
       .gte('helped_time', dayStart.toISOString())
       .lt('helped_time',  dayEnd.toISOString())

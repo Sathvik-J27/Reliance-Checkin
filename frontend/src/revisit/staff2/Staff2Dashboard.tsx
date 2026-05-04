@@ -291,7 +291,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </label>
                   <select
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    onChange={(e) => { setSelectedMonth(parseInt(e.target.value)); setHistoryPage(1); }}
                     className="px-4 py-2 rounded-lg"
                     style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
                   >
@@ -309,7 +309,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </label>
                   <select
                     value={selectedDay}
-                    onChange={(e) => setSelectedDay(parseInt(e.target.value))}
+                    onChange={(e) => { setSelectedDay(parseInt(e.target.value)); setHistoryPage(1); }}
                     className="px-4 py-2 rounded-lg"
                     style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
                   >
@@ -327,7 +327,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                   </label>
                   <select
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    onChange={(e) => { setSelectedYear(parseInt(e.target.value)); setHistoryPage(1); }}
                     className="px-4 py-2 rounded-lg"
                     style={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', color: 'var(--color-text-white)' }}
                   >
