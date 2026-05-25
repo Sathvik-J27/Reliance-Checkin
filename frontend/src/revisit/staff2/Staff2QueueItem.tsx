@@ -1,7 +1,7 @@
 import React from 'react';
 
 const STAFF_NAMES = [
-  'Katia', 'Diane', 'Sarah', 'Ben', 'Dheeraj', 'Om', 'Raj',
+  'Katia', 'Diane', 'Sathvik', 'Ben', 'Dheeraj', 'Om', 'Raj',
   'Alana', 'Aman', 'Maria', 'Susheel', 'Harsh', 'Walter', 'Olivia',
   'Shaik', 'Swatik', 'Ras', 'Self', 'Jugal', 'Preet', 'Lenny',
 ];
