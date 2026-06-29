@@ -299,6 +299,15 @@ export function StaffDashboard({
                             New
                           </span>
                         )}
+                        <span
+                          className="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0"
+                          style={{
+                            backgroundColor: checkIn.isRevisit ? 'rgba(212, 167, 54, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                            color: checkIn.isRevisit ? 'var(--color-gold)' : '#3B82F6',
+                          }}
+                        >
+                          {checkIn.isRevisit ? 'Revisiting' : 'First Time'}
+                        </span>
                         {/* Party Size Indicator */}
                         {checkIn.partySize && (checkIn.partySize.adults > 1 || checkIn.partySize.minors > 0) && (
                           <span 

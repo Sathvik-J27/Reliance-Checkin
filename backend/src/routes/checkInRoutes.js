@@ -1,7 +1,7 @@
 const express = require('express');
 const locationGuard = require('../middleware/locationGuard');
 const { validateCheckIn } = require('../validators/checkInValidator');
-const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone } = require('../services/checkInService');
+const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact } = require('../services/checkInService');
 const { generateWaiverPDF } = require('../services/pdfService');
 const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
@@ -283,6 +283,31 @@ router.get('/check-ins', async (req, res, next) => {
     const checkIns = await getAllCheckIns(date ? { date } : undefined);
     return res.status(200).json({ success: true, data: checkIns });
   } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/check-ins/lookup?q=<phone_or_email>
+ * Searches ALL check-ins (no date limit) by exact phone or email match.
+ * Returns the most recent matching record for the revisit flow.
+ */
+router.get('/check-ins/lookup', async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || !String(q).trim()) {
+      return res.status(400).json({ success: false, error: 'Search term is required' });
+    }
+    console.log('[lookup] searching for:', String(q));
+    const customer = await lookupCustomerByContact(String(q));
+    if (!customer) {
+      console.log('[lookup] no customer found for:', String(q));
+      return res.status(404).json({ success: false, error: 'No previous check-in found with this information.' });
+    }
+    console.log('[lookup] found customer:', customer.firstName, customer.lastName);
+    return res.status(200).json({ success: true, data: customer });
+  } catch (err) {
+    console.error('[lookup] error:', err.message);
     next(err);
   }
 });

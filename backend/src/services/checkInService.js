@@ -292,4 +292,57 @@ async function markAsDone(id, helpedBy) {
   }
 }
 
-module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone };
+const LOOKUP_COLUMNS = [
+  'id', 'first_name', 'last_name', 'street', 'suite_unit', 'city', 'state', 'zip', 'country',
+  'phones', 'emails', 'referral_sources', 'check_in_time', 'is_revisit',
+].join(', ');
+
+async function lookupCustomerByContact(searchTerm) {
+  const trimmed = (searchTerm || '').trim();
+  if (!trimmed) return null;
+
+  let query;
+  if (trimmed.includes('@')) {
+    query = supabase
+      .from('check_ins')
+      .select(LOOKUP_COLUMNS)
+      .filter('emails', 'cs', JSON.stringify([trimmed.toLowerCase()]));
+  } else {
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.length < 10) return null;
+    query = supabase
+      .from('check_ins')
+      .select(LOOKUP_COLUMNS)
+      .filter('phones', 'cs', JSON.stringify([digits]));
+  }
+
+  const { data, error } = await query
+    .order('check_in_time', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Lookup query error:', error);
+    throw new Error(`Lookup failed: ${error.message}`);
+  }
+  if (!data || data.length === 0) return null;
+
+  const row = data[0];
+  return {
+    id:              row.id,
+    firstName:       row.first_name,
+    lastName:        row.last_name,
+    street:          row.street,
+    suiteUnit:       row.suite_unit || '',
+    city:            row.city,
+    state:           row.state,
+    zip:             row.zip,
+    country:         row.country,
+    phones:          row.phones || [],
+    emails:          row.emails || [],
+    referralSources: row.referral_sources || [],
+    checkInTime:     row.check_in_time,
+    isRevisit:       row.is_revisit || false,
+  };
+}
+
+module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact };

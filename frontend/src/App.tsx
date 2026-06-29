@@ -16,8 +16,6 @@ import { Loading } from './components/ui/loading';
 import logo from 'figma:asset/5ebff9a217654d307f5ff0e6abe952a2f7edba47.png';
 import { RevisitLookup } from './revisit/customer/RevisitLookup';
 import { RevisitCheckInStep1 } from './revisit/customer/RevisitCheckInStep1';
-import { RevisitCheckInStep2 } from './revisit/customer/RevisitCheckInStep2';
-import { RevisitWaiver } from './revisit/customer/RevisitWaiver';
 import { RevisitConfirmation } from './revisit/customer/RevisitConfirmation';
 import { Staff2Login } from './revisit/staff2/Staff2Login';
 import { Staff2Dashboard } from './revisit/staff2/Staff2Dashboard';
@@ -61,7 +59,7 @@ function mapApiCheckIn(record: any): CheckIn {
   };
 }
 
-type View = 'home' | 'customer-step1' | 'customer-step2' | 'customer-step3a' | 'customer-step3b' | 'customer-step3c' | 'customer-step3d' | 'customer-step4' | 'staff-login' | 'staff-dashboard' | 'pricing-dashboard' | 'analysis-dashboard' | 'revisit-lookup' | 'revisit-step1' | 'revisit-step2' | 'revisit-waiver' | 'revisit-confirmation' | 'staff2-login' | 'staff2-dashboard' | 'customer-upload' | 'customer-survey' | 'rating-dashboard';
+type View = 'home' | 'customer-step1' | 'customer-step2' | 'customer-step3a' | 'customer-step3b' | 'customer-step3c' | 'customer-step3d' | 'customer-step4' | 'staff-login' | 'staff-dashboard' | 'pricing-dashboard' | 'analysis-dashboard' | 'revisit-lookup' | 'revisit-step1' | 'revisit-step3a' | 'revisit-step3b' | 'revisit-step3c' | 'revisit-step3d' | 'revisit-confirmation' | 'staff2-login' | 'staff2-dashboard' | 'customer-upload' | 'customer-survey' | 'rating-dashboard';
 
 function App() {
   const [view, setView] = useState<View>(() => {
@@ -447,21 +445,97 @@ function App() {
 
   const handleRevisitStep1Next = (updatedData: any) => {
     setRevisitCustomer((prev: any) => ({ ...prev, ...updatedData }));
-    setView('revisit-step2');
+    setView('revisit-step3a');
   };
 
-  const handleRevisitStep2Next = (sources: any[]) => {
-    setRevisitCustomer((prev: any) => ({ ...prev, referralSources: sources }));
-    setView('revisit-waiver');
+  const handleRevisitStep3aNext = (data: { adults: number; minors: number }) => {
+    setPartySize(data);
+    setView('revisit-step3b');
   };
 
-  const handleRevisitWaiverSubmit = async (waiverData: {
-    partySize: { adults: number; minors: number };
+  const handleRevisitStep3bNext = (data: {
+    agreed: boolean;
     signature: string;
-    visitors: any[];
+    esignConsentTimestamp?: string;
+    sessionId?: string;
+    deviceInfo?: any;
   }) => {
+    setMainSignature(data);
+    if (partySize.adults > 1) {
+      setCurrentAdultIndex(0);
+      setAdditionalAdultSignatures([]);
+      setView('revisit-step3c');
+    } else if (partySize.minors > 0) {
+      setView('revisit-step3d');
+    } else {
+      completeRevisitCheckIn(undefined, undefined, data);
+    }
+  };
+
+  const handleRevisitStep3cNext = (data: { name: string; signature: string }) => {
+    const updatedSignatures = [...additionalAdultSignatures];
+    updatedSignatures[currentAdultIndex] = data;
+    setAdditionalAdultSignatures(updatedSignatures);
+    const lastAdditionalAdultIndex = partySize.adults - 2;
+    if (currentAdultIndex < lastAdditionalAdultIndex) {
+      setCurrentAdultIndex(currentAdultIndex + 1);
+    } else if (partySize.minors > 0) {
+      setView('revisit-step3d');
+    } else {
+      completeRevisitCheckIn(undefined, updatedSignatures);
+    }
+  };
+
+  const handleRevisitStep3cBack = () => {
+    if (currentAdultIndex === 0) {
+      setView('revisit-step3b');
+    } else {
+      setCurrentAdultIndex(currentAdultIndex - 1);
+    }
+  };
+
+  const handleRevisitStep3dSubmit = (names: string[]) => {
+    completeRevisitCheckIn(names);
+  };
+
+  const completeRevisitCheckIn = async (
+    submittedMinorNames?: string[],
+    submittedAdultSignatures?: Array<{ name: string; signature: string }>,
+    submittedMainSignature?: {
+      agreed: boolean;
+      signature: string;
+      esignConsentTimestamp?: string;
+      sessionId?: string;
+      deviceInfo?: any;
+    }
+  ) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+
+    const finalMinorNames = submittedMinorNames !== undefined ? submittedMinorNames : minorNames;
+    const finalAdultSignatures = submittedAdultSignatures !== undefined ? submittedAdultSignatures : additionalAdultSignatures;
+    const finalMainSignature = submittedMainSignature !== undefined ? submittedMainSignature : mainSignature;
+
+    const allVisitors = [
+      {
+        name: [revisitCustomer.firstName, revisitCustomer.lastName].filter(Boolean).join(' '),
+        signature: finalMainSignature?.signature || '',
+        isMain: true,
+        isMinor: false,
+      },
+      ...finalAdultSignatures.map((sig: { name: string; signature: string }) => ({
+        name: sig.name,
+        signature: sig.signature,
+        isMain: false,
+        isMinor: false,
+      })),
+      ...finalMinorNames.map((name: string) => ({
+        name,
+        signature: '',
+        isMain: false,
+        isMinor: true,
+      })),
+    ];
 
     const checkInPayload = {
       firstName:       revisitCustomer.firstName,
@@ -475,11 +549,14 @@ function App() {
       phones:          revisitCustomer.phones,
       emails:          revisitCustomer.emails,
       referralSources: revisitCustomer.referralSources || [],
-      signature:       waiverData.signature,
-      partySize:       waiverData.partySize,
-      visitors:        waiverData.visitors,
+      signature:       finalMainSignature?.signature || '',
+      partySize,
+      visitors:        allVisitors,
       checkInTime:     new Date().toISOString(),
       isRevisit:       true,
+      esignConsentTimestamp: finalMainSignature?.esignConsentTimestamp,
+      sessionId:       finalMainSignature?.sessionId,
+      deviceInfo:      finalMainSignature?.deviceInfo,
     };
 
     try {
@@ -502,11 +579,11 @@ function App() {
         id: result.data.id,
         ...revisitCustomer,
         isRevisit: true,
-        signature: waiverData.signature,
+        signature: finalMainSignature?.signature || '',
         checkInTime: new Date(result.data.checkInTime),
         status: 'waiting',
-        partySize: waiverData.partySize,
-        visitors: waiverData.visitors,
+        partySize,
+        visitors: allVisitors,
       };
       setCheckIns(prev => [...prev, newCheckIn]);
     } catch (err) {
@@ -515,6 +592,11 @@ function App() {
       return;
     }
 
+    setPartySize({ adults: 1, minors: 0 });
+    setMainSignature(null);
+    setAdditionalAdultSignatures([]);
+    setCurrentAdultIndex(0);
+    setMinorNames([]);
     setIsSubmitting(false);
     setView('revisit-confirmation');
   };
@@ -730,7 +812,6 @@ function App() {
   if (view === 'revisit-lookup') {
     return (
       <RevisitLookup
-        checkIns={checkIns}
         onCustomerFound={handleRevisitFound}
         onBack={() => setView('home')}
       />
@@ -747,22 +828,58 @@ function App() {
     );
   }
 
-  if (view === 'revisit-step2') {
+  if (view === 'revisit-step3a') {
     return (
-      <RevisitCheckInStep2
-        referralSources={revisitCustomer?.referralSources || []}
-        onNext={handleRevisitStep2Next}
+      <>{loadingOverlay}<CheckInStep3a
+        onNext={handleRevisitStep3aNext}
         onBack={() => setView('revisit-step1')}
-      />
+        initialData={partySize}
+      /></>
     );
   }
 
-  if (view === 'revisit-waiver') {
+  if (view === 'revisit-step3b') {
     return (
-      <>{loadingOverlay}<RevisitWaiver
-        customerName={[revisitCustomer?.firstName, revisitCustomer?.lastName].filter(Boolean).join(' ')}
-        onSubmit={handleRevisitWaiverSubmit}
-        onBack={() => setView('revisit-step2')}
+      <>{loadingOverlay}<CheckInStep3b
+        onNext={handleRevisitStep3bNext}
+        onBack={() => setView('revisit-step3a')}
+        initialData={mainSignature || undefined}
+      /></>
+    );
+  }
+
+  if (view === 'revisit-step3c') {
+    const currentVisitorData = currentAdultIndex < additionalAdultSignatures.length
+      ? additionalAdultSignatures[currentAdultIndex]
+      : undefined;
+
+    return (
+      <>{loadingOverlay}<CheckInStep3c
+        key={`revisit-${currentAdultIndex}`}
+        onNext={handleRevisitStep3cNext}
+        onBack={handleRevisitStep3cBack}
+        visitorNumber={currentAdultIndex + 2}
+        totalAdults={partySize.adults}
+        initialData={currentVisitorData}
+        primaryVisitorName={`${revisitCustomer?.firstName ?? ''} ${revisitCustomer?.lastName ?? ''}`.trim()}
+        takenNames={additionalAdultSignatures.slice(0, currentAdultIndex).map(s => s.name)}
+      /></>
+    );
+  }
+
+  if (view === 'revisit-step3d') {
+    return (
+      <>{loadingOverlay}<CheckInStep3d
+        onNext={handleRevisitStep3dSubmit}
+        onBack={() => {
+          if (partySize.adults > 1) {
+            setCurrentAdultIndex(partySize.adults - 2);
+            setView('revisit-step3c');
+          } else {
+            setView('revisit-step3b');
+          }
+        }}
+        numberOfMinors={partySize.minors}
       /></>
     );
   }
