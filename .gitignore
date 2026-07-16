@@ -9,8 +9,10 @@ node_modules/
 backend/node_modules/
 frontend/node_modules/
 
-# Build output (committed for Railway deployment)
-# frontend/build/
+# Build output (built fresh on every Railway deploy — must NOT be committed,
+# or Nixpacks' post-build COPY step re-introduces the stale committed copy
+# and clobbers the fresh build)
+frontend/build/
 
 # Logs
 *.log
