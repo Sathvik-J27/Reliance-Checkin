@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
 import { Staff2QueueItem, STAFF_NAMES } from './Staff2QueueItem';
 import { Staff2ViewPopup } from './Staff2ViewPopup';
+import { Staff2Search } from './Staff2Search';
 import logo from 'figma:asset/5ebff9a217654d307f5ff0e6abe952a2f7edba47.png';
 
 interface Staff2DashboardProps {
@@ -12,7 +13,7 @@ interface Staff2DashboardProps {
 }
 
 export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: Staff2DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'search'>('queue');
   const [queueCustomers, setQueueCustomers] = useState<any[]>([]);
   const [historyCustomers, setHistoryCustomers] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -214,6 +215,16 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
           >
             History
           </button>
+          <button
+            onClick={() => setActiveTab('search')}
+            className="px-6 py-4 font-medium border-b-2"
+            style={{
+              color: activeTab === 'search' ? 'var(--color-gold)' : 'var(--color-text-gray)',
+              borderColor: activeTab === 'search' ? 'var(--color-gold)' : 'transparent',
+            }}
+          >
+            Search
+          </button>
         </div>
       </div>
 
@@ -275,7 +286,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'history' ? (
           // History Tab
           <div>
             <div className="mb-6">
@@ -504,6 +515,8 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
               </div>
             )}
           </div>
+        ) : (
+          <Staff2Search onView={handleView} />
         )}
       </div>
 

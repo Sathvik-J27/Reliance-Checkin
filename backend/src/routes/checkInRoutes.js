@@ -1,11 +1,12 @@
 const express = require('express');
 const locationGuard = require('../middleware/locationGuard');
 const { validateCheckIn } = require('../validators/checkInValidator');
-const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact } = require('../services/checkInService');
+const { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact, searchCustomers } = require('../services/checkInService');
 const { generateWaiverPDF } = require('../services/pdfService');
 const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
 const { sendSelectionEmail } = require('../services/emailService');
+const searchCache = require('../utils/searchCache');
 
 const router = express.Router();
 
@@ -308,6 +309,38 @@ router.get('/check-ins/lookup', async (req, res, next) => {
     return res.status(200).json({ success: true, data: customer });
   } catch (err) {
     console.error('[lookup] error:', err.message);
+    next(err);
+  }
+});
+
+/**
+ * GET /api/check-ins/search?q=<term>
+ * Partial/fuzzy search across first name, last name, phone, and email
+ * (2+ char minimum). Results are grouped one card per customer, each with
+ * a `visits` array covering every matching check-in. Cached 5 minutes.
+ *
+ * Registered before /check-ins/:id so "search" isn't swallowed as an :id.
+ */
+router.get('/check-ins/search', async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.status(400).json({ success: false, error: 'Query must be at least 2 characters' });
+    }
+
+    const cacheKey = `checkins-search:${q.toLowerCase()}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached, source: 'cache' });
+    }
+
+    searchCache.prune();
+
+    const results = await searchCustomers(q);
+    searchCache.set(cacheKey, results);
+
+    return res.json({ success: true, data: results });
+  } catch (err) {
     next(err);
   }
 });

@@ -345,4 +345,107 @@ async function lookupCustomerByContact(searchTerm) {
   };
 }
 
-module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact };
+const SEARCH_COLUMNS = [
+  'id', 'first_name', 'last_name', 'phones', 'emails',
+  'check_in_time', 'helped_by', 'currently_helped_by', 'status', 'waiver_pdf_url', 'is_revisit',
+].join(', ');
+
+function mapSearchRow(r) {
+  return {
+    id:           r.id,
+    firstName:    r.first_name,
+    lastName:     r.last_name,
+    phones:       r.phones || [],
+    emails:       r.emails || [],
+    checkInTime:  r.check_in_time,
+    helpedBy:     r.helped_by || r.currently_helped_by || null,
+    status:       r.status,
+    waiverPdfUrl: r.waiver_pdf_url || null,
+    isRevisit:    r.is_revisit || false,
+  };
+}
+
+// Escapes LIKE/ILIKE wildcard characters in user input so a literal '%' or
+// '_' typed by staff doesn't change matching semantics.
+function escapeLike(term) {
+  return term.replace(/[\\%_]/g, ch => `\\${ch}`);
+}
+
+/**
+ * CQRS Query: Partial/fuzzy search across first name, last name, phone,
+ * and email for the Staff2 Search tab. Results are grouped into one
+ * customer per matching phone/email identity (same rule as the
+ * insert-time dedup guard in insertCheckIn), each with a `visits` array
+ * covering every matching check-in, newest first.
+ */
+async function searchCustomers(term) {
+  const q = (term || '').trim();
+  if (q.length < 2) return [];
+
+  const pattern = `%${escapeLike(q)}%`;
+  const RAW_LIMIT = 200;
+
+  // Four independent ILIKE queries run in parallel and merged/deduped in JS,
+  // rather than one PostgREST .or(...) filter — raw user input containing
+  // commas or parens (e.g. "(201) 555-1234") would break the or=(...) filter
+  // string syntax.
+  const [byFirst, byLast, byPhone, byEmail] = await Promise.all([
+    supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('first_name', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
+    supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('last_name', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
+    supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('phones_text', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
+    supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('emails_text', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
+  ]);
+
+  for (const r of [byFirst, byLast, byPhone, byEmail]) {
+    if (r.error) throw new Error(`Search failed: ${r.error.message}`);
+  }
+
+  const rowsById = new Map();
+  for (const r of [byFirst, byLast, byPhone, byEmail]) {
+    for (const row of r.data || []) rowsById.set(row.id, mapSearchRow(row));
+  }
+  const rows = [...rowsById.values()];
+
+  // Group rows into customers: union-find over shared phone OR email
+  // (checking every entry in each array, not just index 0), matching the
+  // "same phone or email = same customer" rule used at insert time.
+  const parent = rows.map((_, i) => i);
+  const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+
+  const byPhoneIdx = new Map();
+  const byEmailIdx = new Map();
+  rows.forEach((row, i) => {
+    for (const p of row.phones) { if (byPhoneIdx.has(p)) union(i, byPhoneIdx.get(p)); else byPhoneIdx.set(p, i); }
+    for (const e of row.emails) { if (byEmailIdx.has(e)) union(i, byEmailIdx.get(e)); else byEmailIdx.set(e, i); }
+  });
+
+  const groups = new Map();
+  rows.forEach((_, i) => {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(i);
+  });
+
+  const customers = [...groups.values()].map(indices => {
+    const visits = indices
+      .map(i => rows[i])
+      .sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime());
+    const primary = visits[0];
+    return {
+      firstName: primary.firstName,
+      lastName:  primary.lastName,
+      phones:    [...new Set(indices.flatMap(i => rows[i].phones))],
+      emails:    [...new Set(indices.flatMap(i => rows[i].emails))],
+      visits:    visits.map(v => ({
+        id: v.id, checkInTime: v.checkInTime, helpedBy: v.helpedBy,
+        status: v.status, waiverPdfUrl: v.waiverPdfUrl, isRevisit: v.isRevisit,
+      })),
+    };
+  });
+
+  customers.sort((a, b) => new Date(b.visits[0].checkInTime).getTime() - new Date(a.visits[0].checkInTime).getTime());
+  return customers.slice(0, 20);
+}
+
+module.exports = { insertCheckIn, updateWaiverPdfUrl, completeCheckIn, claimCheckIn, saveDraft, getAllCheckIns, getCheckInById, markAsDone, lookupCustomerByContact, searchCustomers };
