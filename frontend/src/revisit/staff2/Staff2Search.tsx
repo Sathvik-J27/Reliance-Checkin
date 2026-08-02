@@ -188,7 +188,9 @@ export function Staff2Search({ onView }: Staff2SearchProps) {
 
               {/* Visits */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {customer.visits.map((visit: any) => (
+                {customer.visits.map((visit: any) => {
+                  const q = debouncedQuery.trim().toLowerCase();
+                  return (
                   <div
                     key={visit.id}
                     className="rounded-lg"
@@ -197,70 +199,86 @@ export function Staff2Search({ onView }: Staff2SearchProps) {
                       border: '1px solid var(--color-border)',
                       padding: '14px 16px',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '12px',
+                      flexDirection: 'column',
+                      gap: '10px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '14px', rowGap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} style={{ color: 'var(--color-text-gray)' }} />
-                        <span className="text-sm" style={{ color: 'var(--color-text-white)', whiteSpace: 'nowrap' }}>
-                          {formatDate(visit.checkInTime)}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '14px', rowGap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} style={{ color: 'var(--color-text-gray)' }} />
+                          <span className="text-sm" style={{ color: 'var(--color-text-white)', whiteSpace: 'nowrap' }}>
+                            {formatDate(visit.checkInTime)}
+                          </span>
+                        </div>
+                        <span
+                          className="px-2 py-0.5 rounded text-xs font-medium"
+                          style={{
+                            backgroundColor: visit.isRevisit ? 'rgba(212, 167, 54, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                            color: visit.isRevisit ? 'var(--color-gold)' : '#3B82F6',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {visit.isRevisit ? 'Revisiting' : 'First Time'}
                         </span>
+                        <span className="text-xs" style={{ color: 'var(--color-text-gray)', whiteSpace: 'nowrap' }}>
+                          {STATUS_LABELS[visit.status] || visit.status}
+                        </span>
+                        {visit.helpedBy && (
+                          <span className="text-xs" style={{ color: 'var(--color-success)', whiteSpace: 'nowrap' }}>
+                            ✓ Helped by {visit.helpedBy}
+                          </span>
+                        )}
                       </div>
-                      <span
-                        className="px-2 py-0.5 rounded text-xs font-medium"
-                        style={{
-                          backgroundColor: visit.isRevisit ? 'rgba(212, 167, 54, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                          color: visit.isRevisit ? 'var(--color-gold)' : '#3B82F6',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {visit.isRevisit ? 'Revisiting' : 'First Time'}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--color-text-gray)', whiteSpace: 'nowrap' }}>
-                        {STATUS_LABELS[visit.status] || visit.status}
-                      </span>
-                      {visit.helpedBy && (
-                        <span className="text-xs" style={{ color: 'var(--color-success)', whiteSpace: 'nowrap' }}>
-                          ✓ Helped by {visit.helpedBy}
-                        </span>
-                      )}
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
+                        <button
+                          onClick={() => onView({ ...visit, firstName: customer.firstName, lastName: customer.lastName, phones: customer.phones, emails: customer.emails })}
+                          className="px-4 py-2 rounded-lg font-medium"
+                          style={{
+                            backgroundColor: 'var(--color-card)',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-white)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => openWaiver(visit.waiverPdfUrl)}
+                          disabled={!visit.waiverPdfUrl}
+                          title={visit.waiverPdfUrl ? undefined : 'No waiver on file'}
+                          className="px-4 py-2 rounded-lg font-medium"
+                          style={{
+                            backgroundColor: 'var(--color-gold)',
+                            color: 'var(--color-background)',
+                            opacity: visit.waiverPdfUrl ? 1 : 0.5,
+                            cursor: visit.waiverPdfUrl ? 'pointer' : 'not-allowed',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Waiver
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
-                      <button
-                        onClick={() => onView({ ...visit, firstName: customer.firstName, lastName: customer.lastName, phones: customer.phones, emails: customer.emails })}
-                        className="px-4 py-2 rounded-lg font-medium"
-                        style={{
-                          backgroundColor: 'var(--color-card)',
-                          border: '1px solid var(--color-border)',
-                          color: 'var(--color-text-white)',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => openWaiver(visit.waiverPdfUrl)}
-                        disabled={!visit.waiverPdfUrl}
-                        title={visit.waiverPdfUrl ? undefined : 'No waiver on file'}
-                        className="px-4 py-2 rounded-lg font-medium"
-                        style={{
-                          backgroundColor: 'var(--color-gold)',
-                          color: 'var(--color-background)',
-                          opacity: visit.waiverPdfUrl ? 1 : 0.5,
-                          cursor: visit.waiverPdfUrl ? 'pointer' : 'not-allowed',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Waiver
-                      </button>
-                    </div>
+                    {/* Party names — lets staff see who's in the group, and which
+                        name matched when the search hit a non-main visitor. */}
+                    {visit.visitorNames && visit.visitorNames.length > 1 && (
+                      <div className="text-xs" style={{ color: 'var(--color-text-gray)' }}>
+                        👥 Party: {visit.visitorNames.map((name: string, i: number) => {
+                          const isMatch = q.length >= 2 && name.toLowerCase().includes(q);
+                          return (
+                            <span key={i} style={isMatch ? { color: 'var(--color-gold)', fontWeight: 600 } : undefined}>
+                              {name}{i < visit.visitorNames.length - 1 ? ', ' : ''}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

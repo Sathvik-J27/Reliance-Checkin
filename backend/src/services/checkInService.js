@@ -346,7 +346,7 @@ async function lookupCustomerByContact(searchTerm) {
 }
 
 const SEARCH_COLUMNS = [
-  'id', 'first_name', 'last_name', 'phones', 'emails',
+  'id', 'first_name', 'last_name', 'phones', 'emails', 'visitors_text',
   'check_in_time', 'helped_by', 'currently_helped_by', 'status', 'waiver_pdf_url', 'is_revisit',
 ].join(', ');
 
@@ -357,6 +357,10 @@ function mapSearchRow(r) {
     lastName:     r.last_name,
     phones:       r.phones || [],
     emails:       r.emails || [],
+    // Names only (never signatures — visitors_text is generated from just the
+    // "name" field of each visitor, see supabase_migration_visitor_search.sql),
+    // so a card can show who else was in the party without fetching signatures.
+    visitorNames: r.visitors_text ? r.visitors_text.split(' | ').filter(Boolean) : [],
     checkInTime:  r.check_in_time,
     helpedBy:     r.helped_by || r.currently_helped_by || null,
     status:       r.status,
@@ -373,10 +377,11 @@ function escapeLike(term) {
 
 /**
  * CQRS Query: Partial/fuzzy search across first name, last name, phone,
- * and email for the Staff2 Search tab. Results are grouped into one
- * customer per matching phone/email identity (same rule as the
- * insert-time dedup guard in insertCheckIn), each with a `visits` array
- * covering every matching check-in, newest first.
+ * email, and additional/secondary visitor names for the Staff2 Search
+ * tab. Results are grouped into one customer per matching phone/email
+ * identity (same rule as the insert-time dedup guard in insertCheckIn),
+ * each with a `visits` array covering every matching check-in, newest
+ * first.
  */
 async function searchCustomers(term) {
   const q = (term || '').trim();
@@ -385,23 +390,27 @@ async function searchCustomers(term) {
   const pattern = `%${escapeLike(q)}%`;
   const RAW_LIMIT = 200;
 
-  // Four independent ILIKE queries run in parallel and merged/deduped in JS,
+  // Five independent ILIKE queries run in parallel and merged/deduped in JS,
   // rather than one PostgREST .or(...) filter — raw user input containing
   // commas or parens (e.g. "(201) 555-1234") would break the or=(...) filter
   // string syntax.
-  const [byFirst, byLast, byPhone, byEmail] = await Promise.all([
+  const [byFirst, byLast, byPhone, byEmail, byVisitor] = await Promise.all([
     supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('first_name', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
     supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('last_name', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
     supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('phones_text', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
     supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('emails_text', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
+    // Matches additional/secondary visitors too (visitors_text holds just the
+    // "name" field of each visitor in the party, not the main first/last name
+    // already covered above, and never signature data — see the migration).
+    supabase.from('check_ins').select(SEARCH_COLUMNS).ilike('visitors_text', pattern).order('check_in_time', { ascending: false }).limit(RAW_LIMIT),
   ]);
 
-  for (const r of [byFirst, byLast, byPhone, byEmail]) {
+  for (const r of [byFirst, byLast, byPhone, byEmail, byVisitor]) {
     if (r.error) throw new Error(`Search failed: ${r.error.message}`);
   }
 
   const rowsById = new Map();
-  for (const r of [byFirst, byLast, byPhone, byEmail]) {
+  for (const r of [byFirst, byLast, byPhone, byEmail, byVisitor]) {
     for (const row of r.data || []) rowsById.set(row.id, mapSearchRow(row));
   }
   const rows = [...rowsById.values()];
@@ -440,6 +449,7 @@ async function searchCustomers(term) {
       visits:    visits.map(v => ({
         id: v.id, checkInTime: v.checkInTime, helpedBy: v.helpedBy,
         status: v.status, waiverPdfUrl: v.waiverPdfUrl, isRevisit: v.isRevisit,
+        visitorNames: v.visitorNames,
       })),
     };
   });

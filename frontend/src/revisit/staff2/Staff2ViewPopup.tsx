@@ -22,6 +22,25 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
     emails: customer.emails || [''],
   });
 
+  // The parent first opens this popup with a partial customer object (e.g. from
+  // Search, which only has name/phone/email up front), then swaps in the full
+  // record once it's fetched. useState initializers above only run on mount, so
+  // without this the address fields would stay frozen on the partial data even
+  // after the full record arrives.
+  useEffect(() => {
+    setFullName([customer.firstName, customer.lastName].filter(Boolean).join(' '));
+    setFormData({
+      street: customer.street || '',
+      suiteUnit: customer.suiteUnit || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      zip: customer.zip || '',
+      country: customer.country || 'USA',
+      phones: customer.phones || [''],
+      emails: customer.emails || [''],
+    });
+  }, [customer]);
+
   const capitalizeInput = (value: string) => {
     return value
       .split(' ')
