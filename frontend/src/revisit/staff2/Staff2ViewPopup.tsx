@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, ImageIcon, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 
 interface Staff2ViewPopupProps {
   customer: any;
@@ -80,6 +80,29 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
     setFormData({ ...formData, emails: newEmails });
   };
 
+  const [spCopied, setSpCopied] = useState(false);
+
+  const handleCopyForStoneProfits = async () => {
+    const payload = {
+      __source: 'reliance-selectionapp-shipto',
+      jobName: fullName.trim(),
+      address: formData.street.trim(),
+      suite: formData.suiteUnit.trim(),
+      city: formData.city.trim(),
+      state: formData.state.trim(),
+      zip: formData.zip.trim(),
+      phone: (formData.phones[0] || '').trim(),
+      email: (formData.emails[0] || '').trim(),
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload));
+      setSpCopied(true);
+      setTimeout(() => setSpCopied(false), 2000);
+    } catch {
+      alert('Could not copy to clipboard. Make sure the site is loaded over HTTPS and clipboard access is allowed.');
+    }
+  };
+
   const [customerImages, setCustomerImages] = useState<{ checkInId: string; checkInTime: string; images: any[] }[]>([]);
   const [imagesOpen, setImagesOpen] = useState(false);
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -128,13 +151,28 @@ export function Staff2ViewPopup({ customer, onClose, onSave }: Staff2ViewPopupPr
               {customer.isRevisit ? 'Revisiting Customer' : 'First Time Customer'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-opacity-50"
-            style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-gray)' }}
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyForStoneProfits}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+              style={{
+                backgroundColor: spCopied ? 'var(--color-gold)' : 'var(--color-background)',
+                border: '1px solid var(--color-border)',
+                color: spCopied ? 'var(--color-background)' : 'var(--color-text-white)',
+              }}
+              title="Copy Ship To fields for pasting into StoneProfits"
+            >
+              {spCopied ? <Check size={16} /> : <Copy size={16} />}
+              {spCopied ? 'Copied' : 'Copy for StoneProfits'}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-opacity-50"
+              style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-gray)' }}
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Customer Information */}
