@@ -7,6 +7,7 @@ const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
 const { sendSelectionEmail } = require('../services/emailService');
 const searchCache = require('../utils/searchCache');
+const { getAllStaff, addStaff, removeStaff } = require('../services/staffService');
 
 const router = express.Router();
 
@@ -29,6 +30,24 @@ async function broadcastAll() {
     }
   } catch (err) {
     console.error('[SSE] broadcastAll failed:', err.message);
+  }
+}
+
+// Pushes the current staff list so every dashboard's Assign dropdown stays in sync.
+async function broadcastStaff() {
+  if (sseClients.size === 0) return;
+  try {
+    const staff = await getAllStaff();
+    const payload = `data: ${JSON.stringify({ type: 'staff', data: staff })}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(payload);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  } catch (err) {
+    console.error('[SSE] broadcastStaff failed:', err.message);
   }
 }
 
@@ -443,6 +462,63 @@ router.post('/check-ins/:id/claim', async (req, res, next) => {
     // Broadcast so other dashboards see the assignment immediately
     broadcastAll().catch(() => {});
     return res.status(200).json({ success: true, claimed: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/staff
+ * Returns the staff list used by the Assign dropdown and the Staff tab.
+ */
+router.get('/staff', async (_req, res, next) => {
+  try {
+    const staff = await getAllStaff();
+    return res.status(200).json({ success: true, data: staff });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/staff
+ * Body: { name }. Adds a staff member and pushes the new list to all dashboards.
+ */
+router.post('/staff', async (req, res, next) => {
+  try {
+    const name = String(req.body?.name || '').trim().replace(/\s+/g, ' ');
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Name is required' });
+    }
+    if (name.length > 100) {
+      return res.status(400).json({ success: false, error: 'Name must be 100 characters or fewer' });
+    }
+
+    const record = await addStaff(name);
+
+    broadcastStaff().catch(() => {});
+    return res.status(201).json({ success: true, data: record });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/staff/:id
+ * Removes a staff member and pushes the new list to all dashboards.
+ */
+router.delete('/staff/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid staff ID format' });
+    }
+
+    await removeStaff(id);
+
+    broadcastStaff().catch(() => {});
+    return res.status(200).json({ success: true });
   } catch (err) {
     next(err);
   }

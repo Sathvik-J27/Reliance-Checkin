@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
-import { Staff2QueueItem, STAFF_NAMES } from './Staff2QueueItem';
+import { Staff2QueueItem } from './Staff2QueueItem';
 import { Staff2ViewPopup } from './Staff2ViewPopup';
 import { Staff2Search } from './Staff2Search';
+import { Staff2StaffManager, StaffMember } from './Staff2StaffManager';
 import logo from 'figma:asset/5ebff9a217654d307f5ff0e6abe952a2f7edba47.png';
 
 interface Staff2DashboardProps {
@@ -13,7 +14,10 @@ interface Staff2DashboardProps {
 }
 
 export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: Staff2DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'search'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'history' | 'search' | 'staff'>('queue');
+  // Shared staff list (Assign dropdown + Staff tab) — kept fresh by SSE
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const staffNames = staff.map(s => s.name);
   const [queueCustomers, setQueueCustomers] = useState<any[]>([]);
   const [historyCustomers, setHistoryCustomers] = useState<any[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -66,6 +70,13 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
       })
       .catch(() => {});
 
+    fetch('/api/staff')
+      .then(r => r.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data)) setStaff(json.data);
+      })
+      .catch(() => {});
+
     const es = new EventSource('/api/check-ins/events');
 
     es.onmessage = (e) => {
@@ -74,6 +85,8 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
         if (msg.type === 'update' && Array.isArray(msg.data)) {
           setAllCheckIns(msg.data);
           setSseUpdateCount(c => c + 1);
+        } else if (msg.type === 'staff' && Array.isArray(msg.data)) {
+          setStaff(msg.data);
         }
       } catch { /* ignore malformed messages */ }
     };
@@ -153,9 +166,11 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
     const name = c.helpedBy;
     if (name) staffStats[name] = (staffStats[name] || 0) + 1;
   }
-  const staffStatsSorted = STAFF_NAMES
-    .filter(name => staffStats[name])
-    .map(name => ({ name, count: staffStats[name] }));
+  // Current staff first (in list order), then anyone since removed from the list
+  const staffStatsSorted = [
+    ...staffNames.filter(name => staffStats[name]),
+    ...Object.keys(staffStats).filter(name => !staffNames.includes(name)),
+  ].map(name => ({ name, count: staffStats[name] }));
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -225,6 +240,16 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
           >
             Search
           </button>
+          <button
+            onClick={() => setActiveTab('staff')}
+            className="px-6 py-4 font-medium border-b-2"
+            style={{
+              color: activeTab === 'staff' ? 'var(--color-gold)' : 'var(--color-text-gray)',
+              borderColor: activeTab === 'staff' ? 'var(--color-gold)' : 'transparent',
+            }}
+          >
+            Staff
+          </button>
         </div>
       </div>
 
@@ -253,6 +278,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
                     key={customer.id}
                     customer={customer}
                     currentUsername={username}
+                    staffNames={staffNames}
                     onView={handleView}
                     onDone={handleDone}
                     onAssign={handleAssign}
@@ -515,8 +541,10 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'search' ? (
           <Staff2Search onView={handleView} />
+        ) : (
+          <Staff2StaffManager staff={staff} onStaffChange={setStaff} />
         )}
       </div>
 

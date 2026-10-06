@@ -1,23 +1,20 @@
 import React from 'react';
 
-const STAFF_NAMES = [
-  'Katia', 'Diane', 'Sathvik', 'Umesh', 'Ben', 'Dheeraj', 'Om', 'Raj',
-  'Alana', 'Aman', 'Maria', 'Susheel', 'Harsh', 'Walter', 'Olivia',
-  'Shaik', 'Swatik', 'Ras', 'Self', 'Jugal', 'Preet', 'Lenny',
-];
-
 interface Staff2QueueItemProps {
   customer: any;
   currentUsername: string;
+  staffNames: string[];
   onView: (customer: any) => void;
   onDone: (customerId: string) => void;
   onAssign: (customerId: string, staffName: string) => void;
 }
 
-export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onAssign }: Staff2QueueItemProps) {
+export function Staff2QueueItem({ customer, currentUsername, staffNames, onView, onDone, onAssign }: Staff2QueueItemProps) {
   const totalVisitors = (customer.partySize?.adults || 0) + (customer.partySize?.minors || 0);
   const isRevisit = customer.isRevisit === true;
   const assignedTo: string = customer.currentlyHelpedBy || '';
+  // Keep the current assignee selectable even if they were removed from the staff list
+  const options = assignedTo && !staffNames.includes(assignedTo) ? [...staffNames, assignedTo] : staffNames;
 
   const formatTime = (dateValue: any) => {
     if (!dateValue) return '';
@@ -100,7 +97,7 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
             <option value="" style={{ backgroundColor: 'var(--color-card)', color: 'var(--color-text-white)' }}>
               — Assign —
             </option>
-            {STAFF_NAMES.map(name => (
+            {options.map(name => (
               <option
                 key={name}
                 value={name}
@@ -137,5 +134,3 @@ export function Staff2QueueItem({ customer, currentUsername, onView, onDone, onA
     </div>
   );
 }
-
-export { STAFF_NAMES };
