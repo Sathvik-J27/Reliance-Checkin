@@ -7,7 +7,7 @@ const { buildFilePath, uploadPdf } = require('../services/storageService');
 const { generateSelectionPDF } = require('../services/selectionPdfService');
 const { sendSelectionEmail } = require('../services/emailService');
 const searchCache = require('../utils/searchCache');
-const { getAllStaff, addStaff, removeStaff } = require('../services/staffService');
+const { getAllStaff, addStaff, removeStaff, reorderStaff } = require('../services/staffService');
 
 const router = express.Router();
 
@@ -498,6 +498,28 @@ router.post('/staff', async (req, res, next) => {
 
     broadcastStaff().catch(() => {});
     return res.status(201).json({ success: true, data: record });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /api/staff/order
+ * Body: { ids: string[] } — staff IDs in the desired display order.
+ * Registered before /staff/:id routes so "order" isn't treated as an ID.
+ */
+router.patch('/staff/order', async (req, res, next) => {
+  try {
+    const { ids } = req.body || {};
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string' && UUID_RE.test(id))) {
+      return res.status(400).json({ success: false, error: 'ids must be an array of staff IDs' });
+    }
+
+    await reorderStaff(ids);
+
+    broadcastStaff().catch(() => {});
+    return res.status(200).json({ success: true });
   } catch (err) {
     next(err);
   }

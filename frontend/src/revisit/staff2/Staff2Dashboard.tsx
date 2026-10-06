@@ -184,7 +184,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-background)' }}>
       {/* Header */}
       <header className="border-b" style={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }}>
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-6 py-4" style={{ flexWrap: 'wrap', gap: '12px' }}>
           <div className="flex items-center gap-3">
             <img src={logo} alt="Reliance Surfaces" className="w-10 h-10 object-contain" />
             <span className="text-xl font-medium" style={{ color: 'var(--color-text-white)' }}>
@@ -209,7 +209,7 @@ export function Staff2Dashboard({ username, onLogout, checkIns, onMarkAsDone }: 
 
       {/* Tabs */}
       <div className="border-b" style={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)' }}>
-        <div className="flex px-6">
+        <div className="flex px-6 overflow-x-auto" style={{ whiteSpace: 'nowrap' }}>
           <button
             onClick={() => setActiveTab('queue')}
             className="px-6 py-4 font-medium border-b-2"

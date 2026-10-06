@@ -1,13 +1,15 @@
 const supabase = require('../config/supabase');
 
 /**
- * Returns all staff members, alphabetically by name.
+ * Returns all staff members in their custom order (sort_order), with any
+ * unpositioned rows last, alphabetically.
  * @returns {{ id: string, name: string }[]}
  */
 async function getAllStaff() {
   const { data, error } = await supabase
     .from('staff_members')
     .select('id, name')
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('name', { ascending: true });
 
   if (error) {
@@ -18,13 +20,26 @@ async function getAllStaff() {
 }
 
 /**
- * Adds a staff member. Throws with status 409 if the name already exists
- * (case-insensitive, enforced by a unique index on LOWER(name)).
+ * Adds a staff member at the end of the list. Throws with status 409 if the
+ * name already exists (case-insensitive, enforced by a unique index on LOWER(name)).
  */
 async function addStaff(name) {
+  const { data: last, error: maxError } = await supabase
+    .from('staff_members')
+    .select('sort_order')
+    .not('sort_order', 'is', null)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (maxError) {
+    throw new Error(`Failed to add staff member: ${maxError.message}`);
+  }
+
+  const nextOrder = (last?.[0]?.sort_order || 0) + 1;
+
   const { data, error } = await supabase
     .from('staff_members')
-    .insert({ name })
+    .insert({ name, sort_order: nextOrder })
     .select('id, name')
     .single();
 
@@ -55,4 +70,29 @@ async function removeStaff(id) {
   }
 }
 
-module.exports = { getAllStaff, addStaff, removeStaff };
+/**
+ * Saves a new order. `ids` is the full list of staff IDs in the desired order;
+ * IDs not in the table are ignored, and staff missing from `ids` keep their
+ * relative order after the listed ones.
+ */
+async function reorderStaff(ids) {
+  const current = await getAllStaff();
+  const byId = new Map(current.map(s => [s.id, s]));
+
+  const ordered = [
+    ...ids.filter(id => byId.has(id)),
+    ...current.map(s => s.id).filter(id => !ids.includes(id)),
+  ];
+
+  const rows = ordered.map((id, i) => ({ id, name: byId.get(id).name, sort_order: i + 1 }));
+
+  const { error } = await supabase
+    .from('staff_members')
+    .upsert(rows, { onConflict: 'id' });
+
+  if (error) {
+    throw new Error(`Failed to reorder staff: ${error.message}`);
+  }
+}
+
+module.exports = { getAllStaff, addStaff, removeStaff, reorderStaff };
