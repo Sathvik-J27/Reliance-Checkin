@@ -1,9 +1,17 @@
 const crypto  = require('crypto');
 const path    = require('path');
-const supabase = require('../config/supabase');
+const { PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const r2 = require('../config/r2');
 
-const BUCKET        = process.env.STORAGE_BUCKET  || 'waivers';
-const IMAGE_BUCKET  = process.env.IMAGE_BUCKET    || 'customer-images';
+// Waivers live at the bucket root (YYYY/MM/DD/...); customer images under IMAGE_PREFIX.
+const BUCKET       = process.env.R2_BUCKET;
+const PUBLIC_URL   = process.env.R2_PUBLIC_URL.replace(/\/+$/, '');
+const IMAGE_PREFIX = 'customer-images';
+
+/** Public URL for an object key (served via the bucket's r2.dev / custom domain). */
+function publicUrlFor(key) {
+  return `${PUBLIC_URL}/${key}`;
+}
 
 /**
  * Sanitizes a name component for use in a file path.
@@ -40,81 +48,48 @@ function buildFilePath(firstName, lastName, checkInTime) {
  * with the same base name already exists in the bucket on the same day.
  */
 async function resolveUniquePath(basePath) {
-  // Check if the base path exists
-  const { data: existing } = await supabase.storage
-    .from(BUCKET)
-    .list(basePath.substring(0, basePath.lastIndexOf('/')), {
-      search: basePath.substring(basePath.lastIndexOf('/') + 1),
-    });
+  const base = basePath.substring(0, basePath.lastIndexOf('.pdf'));
 
-  if (!existing || existing.length === 0) {
+  // Every key sharing this base name (e.g. X_Waiver.pdf, X_Waiver_1.pdf, ...)
+  const { Contents } = await r2.send(new ListObjectsV2Command({
+    Bucket: BUCKET,
+    Prefix: base,
+  }));
+  const usedKeys = new Set((Contents || []).map(o => o.Key));
+
+  if (!usedKeys.has(basePath)) {
     return basePath;
   }
 
-  // File exists — find a unique suffix
-  const dotIndex  = basePath.lastIndexOf('.pdf');
-  const base      = basePath.substring(0, dotIndex);
-  const dir       = basePath.substring(0, basePath.lastIndexOf('/'));
-  const baseName  = base.substring(base.lastIndexOf('/') + 1);
-
-  const { data: siblings } = await supabase.storage
-    .from(BUCKET)
-    .list(dir);
-
-  const usedNames = new Set((siblings || []).map(f => f.name));
-
   let counter = 1;
-  let candidate;
-  do {
-    candidate = `${dir}/${baseName}_${counter}.pdf`;
+  while (usedKeys.has(`${base}_${counter}.pdf`)) {
     counter++;
-  } while (usedNames.has(`${baseName}_${counter - 1}.pdf`));
-
-  return candidate;
+  }
+  return `${base}_${counter}.pdf`;
 }
 
 /**
- * Uploads a PDF buffer to Supabase Storage with retry logic.
+ * Uploads a PDF buffer to R2 with retry logic.
  * Returns the public URL of the uploaded file.
  */
 async function uploadPdf(pdfBytes, filePath, retries = 3) {
-  const uniquePath = await resolveUniquePath(filePath);
-
   let lastError;
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(uniquePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: false,
-      });
-
-    if (!error) {
-      // Get URL — for private bucket this produces a path-based URL
-      const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(uniquePath);
-
-      return urlData.publicUrl;
-    }
-
-    lastError = error;
-
-    // If the file already exists at this path (race condition), resolve again
-    if (error.message && error.message.toLowerCase().includes('already exists')) {
-      const fallback = await resolveUniquePath(filePath);
-      const { error: retryError } = await supabase.storage
-        .from(BUCKET)
-        .upload(fallback, pdfBytes, { contentType: 'application/pdf', upsert: false });
-
-      if (!retryError) {
-        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fallback);
-        return urlData.publicUrl;
+    try {
+      // Re-resolve each attempt in case another upload took the name meanwhile
+      const uniquePath = await resolveUniquePath(filePath);
+      await r2.send(new PutObjectCommand({
+        Bucket:      BUCKET,
+        Key:         uniquePath,
+        Body:        pdfBytes,
+        ContentType: 'application/pdf',
+      }));
+      return publicUrlFor(uniquePath);
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 500 * attempt));
       }
-    }
-
-    if (attempt < retries) {
-      await new Promise(r => setTimeout(r, 500 * attempt));
     }
   }
 
@@ -122,7 +97,7 @@ async function uploadPdf(pdfBytes, filePath, retries = 3) {
 }
 
 /**
- * Uploads an image buffer to the `customer-images` bucket.
+ * Uploads an image buffer to R2 under the customer-images prefix.
  * Path: {checkInId}/{uuid}.{ext}
  *
  * @param {Buffer} imageBuffer        - Raw image bytes
@@ -135,38 +110,36 @@ async function uploadImage(imageBuffer, checkInId, originalFilename, contentType
   const ext         = path.extname(originalFilename || '').toLowerCase() || '.jpg';
   const uuid        = crypto.randomUUID();
   const storagePath = `${checkInId}/${uuid}${ext}`;
+  const key         = `${IMAGE_PREFIX}/${storagePath}`;
 
-  const { error } = await supabase.storage
-    .from(IMAGE_BUCKET)
-    .upload(storagePath, imageBuffer, {
-      contentType,
-      upsert: false,
-    });
-
-  if (error) {
-    throw new Error(`Image upload failed: ${error.message}`);
+  try {
+    await r2.send(new PutObjectCommand({
+      Bucket:      BUCKET,
+      Key:         key,
+      Body:        imageBuffer,
+      ContentType: contentType,
+    }));
+  } catch (err) {
+    throw new Error(`Image upload failed: ${err.message}`);
   }
 
-  const { data: urlData } = supabase.storage
-    .from(IMAGE_BUCKET)
-    .getPublicUrl(storagePath);
-
-  return { publicUrl: urlData.publicUrl, storagePath };
+  return { publicUrl: publicUrlFor(key), storagePath };
 }
 
 /**
- * Removes an image file from the `customer-images` bucket.
+ * Removes an image file from R2.
  * Called alongside the DB deletion in imageService.deleteImage.
  *
  * @param {string} storagePath - The path that was returned by uploadImage
  */
 async function deleteImageFromStorage(storagePath) {
-  const { error } = await supabase.storage
-    .from(IMAGE_BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    throw new Error(`Failed to delete image from storage: ${error.message}`);
+  try {
+    await r2.send(new DeleteObjectCommand({
+      Bucket: BUCKET,
+      Key:    `${IMAGE_PREFIX}/${storagePath}`,
+    }));
+  } catch (err) {
+    throw new Error(`Failed to delete image from storage: ${err.message}`);
   }
 }
 
