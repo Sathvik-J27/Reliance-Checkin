@@ -33,7 +33,7 @@ export function Staff2QueueItem({ customer, currentUsername, staffNames, onView,
           : '1px solid var(--color-border)',
       }}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="queue-item-row">
         {/* Left side: Initial + Customer Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Initial Circle */}
@@ -45,8 +45,8 @@ export function Staff2QueueItem({ customer, currentUsername, staffNames, onView,
           </div>
 
           {/* Customer Info */}
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <div className="queue-item-meta">
               <p className="font-medium whitespace-nowrap" style={{ color: 'var(--color-text-white)' }}>
                 {[customer.firstName, customer.lastName].filter(Boolean).join(' ')}
               </p>
@@ -81,7 +81,7 @@ export function Staff2QueueItem({ customer, currentUsername, staffNames, onView,
         </div>
 
         {/* Right side: Action Buttons */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="queue-item-actions">
           {/* Staff assignment dropdown */}
           <select
             value={assignedTo}

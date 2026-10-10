@@ -1564,3 +1564,47 @@ h1, h2, h3, h4, h5, h6 {
   syntax: "*";
   inherits: false
 }
+
+/* Staff2 queue card: stack info above actions until there's room for one row */
+.queue-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.queue-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+.queue-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.queue-item-actions select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (width >= 64rem) {
+  .queue-item-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .queue-item-actions {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .queue-item-actions select {
+    flex: none;
+  }
+}
